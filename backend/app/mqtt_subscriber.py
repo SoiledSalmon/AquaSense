@@ -142,7 +142,7 @@ async def catch_up_user(user: dict, supabase_admin, settings, repo: ReadingsRepo
             logger.error("mqtt_catch_up_failed", user_id=user_id, error=str(e))
 
 
-async def handle_mqtt_message(message, repo: ReadingsRepository):
+async def handle_mqtt_message(message, repo: ReadingsRepository, sse_manager=None):
     """Process and store a live MQTT reading message."""
     topic = str(message.topic)
     payload_str = message.payload.decode("utf-8")
@@ -189,8 +189,17 @@ async def handle_mqtt_message(message, repo: ReadingsRepository):
         inserted = await repo.insert_reading(reading_obj.model_dump())
         logger.info("mqtt_msg_inserted", reading_id=inserted.get("id"), user_id=user_id)
 
-        await ml_pipeline.process(inserted)
-        # SSE streaming stub goes here in Phase 3
+        processed = await ml_pipeline.process(inserted)
+        
+        if sse_manager:
+            # Serialise datetime fields for JSON transmission
+            serializable = {}
+            for k, v in processed.items():
+                if isinstance(v, datetime):
+                    serializable[k] = v.isoformat()
+                else:
+                    serializable[k] = v
+            await sse_manager.send_event(user_id, "reading_update", serializable)
 
     except json.JSONDecodeError:
         logger.error("mqtt_invalid_json", payload=payload_str)
@@ -270,7 +279,7 @@ async def run_mqtt_subscriber(app):
 
                 try:
                     async for message in client.messages:
-                        await handle_mqtt_message(message, repo)
+                        await handle_mqtt_message(message, repo, app.state.sse_manager)
                 finally:
                     poll_task.cancel()
 

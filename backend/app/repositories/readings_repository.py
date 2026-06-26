@@ -49,3 +49,45 @@ class ReadingsRepository:
         
         timestamp_str = response.data[0]["timestamp"]
         return datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+
+    async def get_latest_reading(self, user_id: str) -> dict | None:
+        """Get the latest reading + computed metrics for a user."""
+        response = (
+            self._client.table("readings")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("timestamp", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if not response.data:
+            return None
+        return response.data[0]
+
+    async def get_hourly_readings(self, user_id: str, limit: int = 24) -> list[dict]:
+        """Get hourly aggregated readings for the user, in chronological order."""
+        response = (
+            self._client.table("readings_hourly")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("bucket", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        data = response.data or []
+        data.reverse()
+        return data
+
+    async def get_daily_readings(self, user_id: str, limit: int = 30) -> list[dict]:
+        """Get daily aggregated readings for the user, in chronological order."""
+        response = (
+            self._client.table("readings_daily")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("bucket", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        data = response.data or []
+        data.reverse()
+        return data

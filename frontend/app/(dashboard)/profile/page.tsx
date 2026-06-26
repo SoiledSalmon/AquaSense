@@ -2,6 +2,8 @@ import React from 'react'
 import { getMe } from '../../../lib/api/auth'
 import ProfileForm from '../../../components/profile/ProfileForm'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Profile Settings | AquaSense',
   description: 'Manage your profile and ThingSpeak integrations.',

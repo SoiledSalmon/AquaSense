@@ -1,5 +1,3 @@
-import { cookies } from 'next/headers'
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 async function getHeaders() {
@@ -9,6 +7,7 @@ async function getHeaders() {
 
   if (typeof window === 'undefined') {
     try {
+      const { cookies } = await import('next/headers')
       const cookieStore = await cookies()
       const cookieString = cookieStore.toString()
       if (cookieString) {
@@ -46,6 +45,7 @@ async function handleResponse(res: Response) {
     try {
       const setCookieHeaders = res.headers.getSetCookie()
       if (setCookieHeaders && setCookieHeaders.length > 0) {
+        const { cookies } = await import('next/headers')
         const cookieStore = await cookies()
         for (const cookieStr of setCookieHeaders) {
           const parts = cookieStr.split(';')
@@ -117,6 +117,7 @@ export async function logout() {
 
   if (typeof window === 'undefined') {
     try {
+      const { cookies } = await import('next/headers')
       const cookieStore = await cookies()
       cookieStore.delete('access_token')
       cookieStore.delete('refresh_token')

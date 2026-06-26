@@ -13,6 +13,8 @@ from slowapi.errors import RateLimitExceeded
 from supabase import create_client
 
 from app.api.auth_router import router as auth_router, limiter
+from app.api.readings_router import router as readings_router
+from app.services.sse_manager import sse_manager
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 
@@ -42,6 +44,9 @@ async def lifespan(app: FastAPI):
         settings.SUPABASE_URL,
         settings.SUPABASE_SERVICE_ROLE_KEY
     )
+
+    # Initialize SSE Manager in application state
+    app.state.sse_manager = sse_manager
 
     # Start the background MQTT subscriber task
     mqtt_task = asyncio.create_task(run_mqtt_subscriber(app))
@@ -91,6 +96,7 @@ async def add_security_headers(request: Request, call_next):
 
 # ── Routers ───────────────────────────────────────────
 app.include_router(auth_router)
+app.include_router(readings_router)
 
 # ── Health Check ──────────────────────────────────────
 @app.get("/api/health", tags=["health"])

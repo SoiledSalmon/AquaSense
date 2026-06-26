@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import LoginForm from '../../../components/auth/LoginForm'
 
 export const metadata = {
@@ -9,7 +9,9 @@ export const metadata = {
 export default function LoginPage() {
   return (
     <div>
-      <LoginForm />
+      <Suspense fallback={<div className="text-slate-400 text-sm text-center py-4">Loading login form...</div>}>
+        <LoginForm />
+      </Suspense>
     </div>
   )
 }
