@@ -14,6 +14,7 @@ from supabase import create_client
 
 from app.api.auth_router import router as auth_router, limiter
 from app.api.readings_router import router as readings_router
+from app.api.alerts_router import router as alerts_router
 from app.services.sse_manager import sse_manager
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
@@ -29,9 +30,16 @@ async def lifespan(app: FastAPI):
     """
     import asyncio
     from app.mqtt_subscriber import run_mqtt_subscriber
+    from app.ml import load_models
 
     settings = get_settings()
     logger.info("app_starting", environment=settings.ENVIRONMENT)
+
+    # Trigger model loading/training once at startup
+    try:
+        load_models()
+    except Exception as e:
+        logger.error("app_model_loading_failed_at_startup", error=str(e))
 
     # Initialize Supabase client (anon role)
     app.state.supabase = create_client(
@@ -97,6 +105,7 @@ async def add_security_headers(request: Request, call_next):
 # ── Routers ───────────────────────────────────────────
 app.include_router(auth_router)
 app.include_router(readings_router)
+app.include_router(alerts_router)
 
 # ── Health Check ──────────────────────────────────────
 @app.get("/api/health", tags=["health"])

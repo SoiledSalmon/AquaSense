@@ -12,7 +12,9 @@ import {
   TrendingUp,
   Clock,
   RefreshCw,
-  Info
+  Info,
+  Bell,
+  Check
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -26,6 +28,7 @@ import {
 } from 'recharts'
 
 import { getLatestReading, getReadingsHistory, getSSEStreamUrl } from '../../lib/api/readings'
+import { getAlerts, acknowledgeAlert } from '../../lib/api/alerts'
 
 interface User {
   id: string
@@ -51,6 +54,11 @@ interface Alert {
   timestamp: string
   message: string
   is_read: boolean
+  severity?: 'info' | 'warning' | 'critical'
+  category?: string
+  is_acknowledged?: boolean
+  is_resolved?: boolean
+  recommendation?: string
 }
 
 export default function LiveDashboard({ user }: { user: User }) {
@@ -64,12 +72,19 @@ export default function LiveDashboard({ user }: { user: User }) {
   const [loading, setLoading] = useState(true)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [alertsFilter, setAlertsFilter] = useState<'unacknowledged' | 'all' | 'resolved'>('unacknowledged')
+  const [alertsLoading, setAlertsLoading] = useState(false)
 
   // Keep a reference to range for the SSE callback
   const rangeRef = useRef(range)
   useEffect(() => {
     rangeRef.current = range
   }, [range])
+
+  const alertsFilterRef = useRef(alertsFilter)
+  useEffect(() => {
+    alertsFilterRef.current = alertsFilter
+  }, [alertsFilter])
 
   // --- Initial Data Load ---
   useEffect(() => {
@@ -85,6 +100,11 @@ export default function LiveDashboard({ user }: { user: User }) {
         if (historyRes && historyRes.data) {
           setHistoryData(historyRes.data)
         }
+
+        const alertsRes = await getAlerts('unacknowledged')
+        if (alertsRes && alertsRes.alerts) {
+          setAlerts(alertsRes.alerts)
+        }
       } catch (err: any) {
         console.error('Failed to fetch initial telemetry data:', err)
         setError(err.message || 'Failed to load telemetry')
@@ -99,6 +119,27 @@ export default function LiveDashboard({ user }: { user: User }) {
       setLoading(false)
     }
   }, [user.channel_id])
+
+  const fetchFilteredAlerts = async (status: 'unacknowledged' | 'all' | 'resolved') => {
+    try {
+      setAlertsLoading(true)
+      const res = await getAlerts(status)
+      if (res && res.alerts) {
+        setAlerts(res.alerts)
+      }
+    } catch (err) {
+      console.error('Failed to fetch filtered alerts:', err)
+    } finally {
+      setAlertsLoading(false)
+    }
+  }
+
+  // Effect to load alerts when filter changes
+  useEffect(() => {
+    if (user.channel_id && !loading) {
+      fetchFilteredAlerts(alertsFilter)
+    }
+  }, [alertsFilter, user.channel_id])
 
   // --- Range Changes ---
   const handleRangeChange = async (newRange: '24h' | '7d' | '30d') => {
@@ -182,6 +223,7 @@ export default function LiveDashboard({ user }: { user: User }) {
           setAlerts((prev) => {
             // Avoid duplicate alerts
             if (prev.some((a) => a.id === data.id)) return prev
+            if (alertsFilterRef.current === 'resolved') return prev
             return [data, ...prev]
           })
         } catch (err) {
@@ -206,8 +248,23 @@ export default function LiveDashboard({ user }: { user: User }) {
   }, [user.channel_id, user.id])
 
   // --- Alert Acknowledgement ---
-  const dismissAlert = (alertId: string) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== alertId))
+  const dismissAlert = async (alertId: string) => {
+    try {
+      await acknowledgeAlert(alertId)
+      if (alertsFilter === 'unacknowledged') {
+        setAlerts((prev) => prev.filter((a) => a.id !== alertId))
+      } else {
+        setAlerts((prev) =>
+          prev.map((a) =>
+            a.id === alertId
+              ? { ...a, is_acknowledged: true, is_read: true }
+              : a
+          )
+        )
+      }
+    } catch (err) {
+      console.error('Failed to acknowledge alert:', err)
+    }
   }
 
   // --- WQI Display Configuration ---
@@ -370,31 +427,115 @@ export default function LiveDashboard({ user }: { user: User }) {
         </div>
       </div>
 
-      {/* ── Alerts Banner Section ─────────────────────────────────── */}
-      {alerts.length > 0 && (
-        <div className="space-y-3">
-          {alerts.map((alert) => (
-            <div
-              key={alert.id}
-              className="flex items-start justify-between p-4 rounded-xl border border-rose-950/40 bg-rose-950/10 backdrop-blur-md animate-pulse"
-            >
-              <div className="flex gap-3">
-                <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-sm font-bold text-rose-300">Contaminant Warning Alert</h4>
-                  <p className="text-xs text-rose-200 mt-1">{alert.message}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => dismissAlert(alert.id)}
-                className="text-xs text-rose-400 hover:text-rose-200 hover:underline px-2 py-0.5 rounded transition"
-              >
-                Dismiss
-              </button>
+      {/* ── Alerts & Notification Center ─────────────────────────── */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-6 space-y-6 backdrop-blur-md">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Bell className="w-5 h-5 text-blue-400" />
+              {alerts.filter(a => !a.is_acknowledged).length > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                </span>
+              )}
             </div>
-          ))}
+            <div>
+              <h3 className="font-bold text-slate-200 text-base">Alerts & Notification Center</h3>
+              <p className="text-xs text-slate-400">
+                {alerts.filter(a => !a.is_acknowledged).length} active warnings detected
+              </p>
+            </div>
+          </div>
+
+          {/* Filter Tabs */}
+          <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800 text-xs self-start sm:self-auto">
+            {(['unacknowledged', 'resolved', 'all'] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setAlertsFilter(filter)}
+                className={`px-3 py-1.5 rounded-md font-semibold transition capitalize ${
+                  alertsFilter === filter ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {filter === 'unacknowledged' ? 'Active' : filter}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
+
+        {/* Alerts List */}
+        {alertsLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
+          </div>
+        ) : alerts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 space-y-3 border border-dashed border-slate-800 rounded-xl bg-slate-950/10">
+            <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+            <div className="text-center">
+              <p className="text-sm font-semibold text-slate-300">All Systems Healthy</p>
+              <p className="text-xs text-slate-500 max-w-sm mt-1">
+                No alerts detected. All water parameters are within standard operating thresholds.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+            {alerts.map((alert) => {
+              const sev = alert.severity || 'info'
+              const isCrit = sev === 'critical'
+              const isWarn = sev === 'warning'
+              
+              const severityTheme = isCrit 
+                ? { bg: 'bg-rose-500/10 border-rose-500/20', text: 'text-rose-400', icon: <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" /> }
+                : isWarn
+                ? { bg: 'bg-amber-500/10 border-amber-500/20', text: 'text-amber-400', icon: <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" /> }
+                : { bg: 'bg-blue-500/10 border-blue-500/20', text: 'text-blue-400', icon: <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" /> }
+
+              return (
+                <div
+                  key={alert.id}
+                  className={`flex flex-col md:flex-row md:items-start justify-between gap-4 p-4 rounded-xl border ${severityTheme.bg} backdrop-blur-md transition-all duration-300`}
+                >
+                  <div className="flex gap-3 items-start">
+                    {severityTheme.icon}
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-slate-900 border border-slate-800 ${severityTheme.text}`}>
+                          {sev}
+                        </span>
+                        <span className="text-xs font-bold text-slate-400 capitalize">
+                          {alert.category || 'general'}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {new Date(alert.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-200">{alert.message}</h4>
+                      {alert.recommendation && (
+                        <p className="text-xs text-slate-400 leading-relaxed pt-1 border-t border-slate-800/40">
+                          <span className="font-bold text-slate-300">Recommendation: </span>
+                          {alert.recommendation}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {!alert.is_acknowledged && (
+                    <button
+                      onClick={() => dismissAlert(alert.id)}
+                      className="flex items-center gap-1.5 self-end md:self-start px-3.5 py-1.5 bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 text-xs font-bold text-slate-300 hover:text-white rounded-lg transition"
+                    >
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Acknowledge</span>
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {/* ── Radial WQI Score & ML Analysis ───────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

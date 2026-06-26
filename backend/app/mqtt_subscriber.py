@@ -131,7 +131,7 @@ async def catch_up_user(user: dict, supabase_admin, settings, repo: ReadingsRepo
 
                 try:
                     inserted = await repo.insert_reading(reading_obj.model_dump())
-                    await ml_pipeline.process(inserted)
+                    await ml_pipeline.process(inserted, repo)
                     inserted_count += 1
                 except Exception as ie:
                     logger.error("mqtt_catch_up_insert_error", user_id=user_id, error=str(ie))
@@ -189,7 +189,7 @@ async def handle_mqtt_message(message, repo: ReadingsRepository, sse_manager=Non
         inserted = await repo.insert_reading(reading_obj.model_dump())
         logger.info("mqtt_msg_inserted", reading_id=inserted.get("id"), user_id=user_id)
 
-        processed = await ml_pipeline.process(inserted)
+        processed = await ml_pipeline.process(inserted, repo)
         
         if sse_manager:
             # Serialise datetime fields for JSON transmission
@@ -200,6 +200,17 @@ async def handle_mqtt_message(message, repo: ReadingsRepository, sse_manager=Non
                 else:
                     serializable[k] = v
             await sse_manager.send_event(user_id, "reading_update", serializable)
+            
+            # Send new alert event over SSE if generated
+            new_alert = processed.get("new_alert")
+            if new_alert:
+                alert_serializable = {}
+                for k, v in new_alert.items():
+                    if isinstance(v, datetime):
+                        alert_serializable[k] = v.isoformat()
+                    else:
+                        alert_serializable[k] = v
+                await sse_manager.send_event(user_id, "alert_new", alert_serializable)
 
     except json.JSONDecodeError:
         logger.error("mqtt_invalid_json", payload=payload_str)
