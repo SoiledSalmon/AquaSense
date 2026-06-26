@@ -12,9 +12,13 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from supabase import create_client
 
+from app.core.logging import setup_logging
+setup_logging()
+
 from app.api.auth_router import router as auth_router, limiter
 from app.api.readings_router import router as readings_router
 from app.api.alerts_router import router as alerts_router
+from app.api.admin_router import router as admin_router
 from app.services.sse_manager import sse_manager
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
@@ -106,9 +110,15 @@ async def add_security_headers(request: Request, call_next):
 app.include_router(auth_router)
 app.include_router(readings_router)
 app.include_router(alerts_router)
+app.include_router(admin_router)
 
 # ── Health Check ──────────────────────────────────────
 @app.get("/api/health", tags=["health"])
-async def health_check():
+async def health_check(request: Request):
     """Health check endpoint to verify backend status."""
-    return {"status": "healthy", "service": "backend"}
+    mqtt_status = getattr(request.app.state, "mqtt_status", "unknown")
+    return {
+        "status": "healthy",
+        "service": "backend",
+        "mqtt_status": mqtt_status
+    }

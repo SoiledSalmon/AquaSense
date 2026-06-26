@@ -245,6 +245,7 @@ async def run_mqtt_subscriber(app):
     # Add a short delay to let FastAPI startup complete
     await asyncio.sleep(2.0)
     logger.info("mqtt_subscriber_starting")
+    app.state.mqtt_status = "starting"
 
     settings = get_settings()
     supabase_admin = app.state.supabase_admin
@@ -263,6 +264,7 @@ async def run_mqtt_subscriber(app):
                 timeout=15.0,
             ) as client:
                 logger.info("mqtt_connected")
+                app.state.mqtt_status = "connected"
                 reconnect_delay = 1.0
 
                 # Clear and reload local maps
@@ -296,12 +298,16 @@ async def run_mqtt_subscriber(app):
 
         except aiomqtt.MqttError as me:
             logger.warning("mqtt_connection_error", error=str(me), retry_in=reconnect_delay)
+            app.state.mqtt_status = "reconnecting"
             await asyncio.sleep(reconnect_delay)
             reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
         except asyncio.CancelledError:
             logger.info("mqtt_subscriber_shutdown")
+            app.state.mqtt_status = "stopped"
             break
         except Exception as e:
             logger.error("mqtt_unexpected_error", error=str(e), retry_in=reconnect_delay)
+            app.state.mqtt_status = "error"
             await asyncio.sleep(reconnect_delay)
             reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
+

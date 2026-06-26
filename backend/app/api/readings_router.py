@@ -54,7 +54,7 @@ async def get_latest_reading(
 @router.get("/readings", status_code=status.HTTP_200_OK)
 async def get_readings_history(
     current_user: Annotated[dict, Depends(get_current_user)],
-    range: str = Query("24h", regex="^(24h|7d|30d)$"),
+    range: str = Query("24h", pattern="^(24h|7d|30d)$"),
     repo: ReadingsRepository = Depends(_get_readings_repo),
 ):
     """Retrieve aggregated readings history for the user based on range ('24h', '7d', '30d')."""

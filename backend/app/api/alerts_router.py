@@ -32,7 +32,7 @@ def _get_alert_repo(
 @router.get("/alerts", status_code=status.HTTP_200_OK)
 async def get_alerts(
     current_user: Annotated[dict, Depends(get_current_user)],
-    status_filter: str = Query("unacknowledged", alias="status", regex="^(all|unread|unacknowledged|resolved|active)$"),
+    status_filter: str = Query("unacknowledged", alias="status", pattern="^(all|unread|unacknowledged|resolved|active)$"),
     limit: int = Query(50, ge=1, le=100),
     repo: AlertRepository = Depends(_get_alert_repo),
 ):

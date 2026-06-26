@@ -92,3 +92,26 @@ def get_supabase_admin(request: Request):
     app_metadata updates, session revocation. NEVER exposed to frontend.
     """
     return request.app.state.supabase_admin
+
+
+async def get_current_admin(
+    current_user: Annotated[dict, Depends(get_current_user)]
+) -> dict:
+    """Verify that the current user has the admin role.
+
+    Checks the 'role' field from the claims dictionary, falling back
+    to app_metadata.role if 'role' is 'authenticated' or missing.
+    Raises a 403 Forbidden HTTP exception if the user is not an admin.
+    """
+    role = current_user.get("role")
+    if not role or role == "authenticated":
+        app_metadata = current_user.get("app_metadata", {})
+        role = app_metadata.get("role", "user") if isinstance(app_metadata, dict) else "user"
+
+    if role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Administrator access required"
+        )
+    return current_user
+
