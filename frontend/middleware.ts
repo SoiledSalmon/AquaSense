@@ -19,8 +19,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  if (isAuthPage && isAuthenticated) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  if (isAuthPage) {
+    if (request.nextUrl.searchParams.has('clear')) {
+      const response = NextResponse.next()
+      response.cookies.delete('access_token')
+      response.cookies.delete('refresh_token')
+      return response
+    }
+    if (isAuthenticated) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
   }
 
   return NextResponse.next()

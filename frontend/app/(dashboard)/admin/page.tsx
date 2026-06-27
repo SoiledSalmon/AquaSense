@@ -15,7 +15,7 @@ export default async function AdminPage() {
   try {
     user = await getMe()
   } catch (err) {
-    redirect('/login')
+    redirect('/login?clear=true')
   }
 
   if (!user || user.role !== 'admin') {

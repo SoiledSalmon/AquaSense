@@ -1,4 +1,5 @@
 import React from 'react'
+import { redirect } from 'next/navigation'
 import { getMe } from '../../../lib/api/auth'
 import LiveDashboard from '../../../components/dashboard/LiveDashboard'
 
@@ -10,7 +11,12 @@ export const metadata = {
 }
 
 export default async function DashboardPage() {
-  const user = await getMe()
+  let user
+  try {
+    user = await getMe()
+  } catch (err) {
+    redirect('/login?clear=true')
+  }
 
   return (
     <div className="space-y-6">

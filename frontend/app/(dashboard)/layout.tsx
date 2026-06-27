@@ -13,12 +13,12 @@ export default async function DashboardLayout({
   try {
     user = await getMe()
   } catch (err) {
-    // If auth fails, redirect to login
-    redirect('/login')
+    // If auth fails, redirect to login and clear cookies
+    redirect('/login?clear=true')
   }
 
   if (!user) {
-    redirect('/login')
+    redirect('/login?clear=true')
   }
 
   return (
