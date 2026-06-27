@@ -5,15 +5,15 @@
 // WiFi Credentials
 //====================================================
 
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
+const char* ssid = "Ananth's Oppo A17";
+const char* password = "Anipollu123";
 
 //====================================================
 // ThingSpeak
 //====================================================
 
 unsigned long channelID = 0; // Replace with your Channel ID
-const char* writeAPIKey = "YOUR_THINGSPEAK_WRITE_API_KEY";
+const char* writeAPIKey = "KWT3638R6HM9UYXQ";
 
 WiFiClient client;
 
