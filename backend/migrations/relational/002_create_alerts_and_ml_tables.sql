@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_alerts_user_time ON public.alerts (user_id, times
 -- Create the ml_results table
 CREATE TABLE IF NOT EXISTS public.ml_results (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  reading_id     UUID,  -- Stored as plain UUID to avoid TimescaleDB hypertable foreign key limitations
+  reading_id     UUID,  -- Stored as plain UUID to keep schema decoupled
   user_id        UUID REFERENCES public.users(id) ON DELETE CASCADE,
   timestamp      TIMESTAMPTZ NOT NULL,
   ph_smoothed    NUMERIC(5,2),

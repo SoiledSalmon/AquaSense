@@ -1224,12 +1224,6 @@ export default function AdminDashboard({ user }: { user: User }) {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-300">TimescaleDB Hypertable Engine</span>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                    OPERATIONAL
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-slate-300">ThingSpeak MQTT Ingestion Service</span>
                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono">
                     {stats.system_status?.mqtt_subscriber?.toUpperCase() || 'UNKNOWN'}

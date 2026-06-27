@@ -1,16 +1,13 @@
 -- ============================================================
--- AquaSense Phase 2: Readings Hypertable (TimescaleDB)
+-- AquaSense Phase 2: Readings Table & Indexes (PostgreSQL 17)
 -- Execute in Supabase SQL Editor or via Supabase CLI
 -- ============================================================
 
--- Enable the TimescaleDB extension if not already enabled
-CREATE EXTENSION IF NOT EXISTS timescaledb;
-
 -- Create the readings table
-CREATE TABLE IF NOT EXISTS readings (
+CREATE TABLE IF NOT EXISTS public.readings (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   timestamp   TIMESTAMPTZ NOT NULL,
-  id          UUID DEFAULT gen_random_uuid(),
-  user_id     UUID REFERENCES users(id),
+  user_id     UUID REFERENCES public.users(id) ON DELETE CASCADE,
   ph          NUMERIC(5,2),
   tds         NUMERIC(7,2),
   turbidity   NUMERIC(7,2),
@@ -18,16 +15,8 @@ CREATE TABLE IF NOT EXISTS readings (
   label       TEXT
 );
 
--- Convert to hypertable with a 1-day chunk interval
-SELECT create_hypertable('readings', 'timestamp', chunk_time_interval => INTERVAL '1 day', if_not_exists => TRUE);
+-- Add a standard B-tree index on the timestamp column
+CREATE INDEX IF NOT EXISTS idx_readings_timestamp ON public.readings (timestamp DESC);
 
--- Add the composite index
-CREATE INDEX IF NOT EXISTS idx_readings_user_time ON readings (user_id, timestamp DESC);
-
--- Enable compression and add the 7-day compression policy
-ALTER TABLE readings SET (
-  timescaledb.compress,
-  timescaledb.compress_segmentby = 'user_id'
-);
-
-SELECT add_compression_policy('readings', INTERVAL '7 days', if_not_exists => TRUE);
+-- Add a composite index on (user_id, timestamp DESC) for common query patterns
+CREATE INDEX IF NOT EXISTS idx_readings_user_time ON public.readings (user_id, timestamp DESC);

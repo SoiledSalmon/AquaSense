@@ -8,9 +8,9 @@ This document contains step-by-step instructions for deploying, validating, and 
 
 The system consists of three main hosting components:
 1. **Supabase (Database & Auth)**:
-   - PostgreSQL 15 engine (required for TimescaleDB extension).
+   - PostgreSQL 17 engine (default database cluster).
    - Supabase Auth manages secure user registration and JWT-based session token exchange.
-   - TimescaleDB extension manages the `readings` hypertable (1-day chunk interval, 7-day compression policy) and continuous aggregate hourly/daily materialized views.
+   - Plain PostgreSQL time-series setup manages telemetry in the `readings` table (equipped with high-performance indexes) and aggregates hourly/daily trends via PostgreSQL materialized views.
 2. **Railway (FastAPI Backend + MQTT Subscriber)**:
    - Always-on container process.
    - Houses the REST API endpoints and Server-Sent Events (SSE) broadcaster.
@@ -25,7 +25,7 @@ The system consists of three main hosting components:
 
 ### 2.1 Project Creation
 1. Go to the [Supabase Dashboard](https://supabase.com) and create a new project.
-2. **Critical**: Ensure the project is provisioned with **PostgreSQL 15**. (Supabase does not support the TimescaleDB extension on Postgres 16 or 17).
+2. The project is provisioned with **PostgreSQL 17** (standard default). No custom/older engine version is required.
 3. Record the project **URL**, **Anon (Public) API key**, **Service Role (Admin) API key**, and **JWT Secret**.
 
 ### 2.2 Running Migrations
@@ -36,9 +36,9 @@ Run the following migration scripts in order. You can execute them via the Supab
    - Run [002_create_alerts_and_ml_tables.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/relational/002_create_alerts_and_ml_tables.sql) to create relational alerts, ML predictions, and training audit log schemas.
    - Run [003_update_alerts_table.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/relational/003_update_alerts_table.sql) to support severity, category, and acknowledgement statuses.
 
-2. **TimescaleDB Time-Series Schema**:
-   - Run [001_create_readings_hypertable.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/timescaledb/001_create_readings_hypertable.sql) to enable the `timescaledb` extension, create the telemetry table, partition it into chunks, and add the 7-day compression policy.
-   - Run [002_create_continuous_aggregates.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/timescaledb/002_create_continuous_aggregates.sql) to establish hourly/daily pre-computed aggregates and configure automatic refresh policies.
+2. **PostgreSQL Time-Series Schema**:
+   - Run [001_create_readings_hypertable.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/timescaledb/001_create_readings_hypertable.sql) to create the standard telemetry table and configure timestamp and composite indexes.
+   - Run [002_create_continuous_aggregates.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/timescaledb/002_create_continuous_aggregates.sql) to establish hourly/daily materialized views, define unique indexing constraints, and register pg_cron schedule timers.
 
 ---
 
@@ -116,9 +116,13 @@ Log parsers can index fields such as `timestamp`, `level`, `event`, `user_id`, a
   pg_dump -h db.xyz.supabase.co -U postgres -d postgres -F c -b -v -f aquasense_backup.dump
   ```
 
-### 6.2 TimescaleDB Maintenance
-- **Compression policy**: Active data is automatically compressed after 7 days, reducing storage footprint by up to 90%.
-- **Decompression**: If historical records require manual correction, temporarily pause the compression policy:
+### 6.2 Materialized Views Maintenance & Refresh Schedule
+- **Refresh Schedule (pg_cron)**: By default, view aggregation updates are scheduled to execute automatically via the `pg_cron` extension:
+  - `readings_hourly` refreshes concurrently every hour: `0 * * * *`
+  - `readings_daily` refreshes concurrently once a day: `5 0 * * *`
+- **Manual Refresh Command**: If views need to be populated or refreshed manually, execute the following SQL commands:
   ```sql
-  SELECT alter_job_relation('readings', scheduled => false);
+  REFRESH MATERIALIZED VIEW CONCURRENTLY public.readings_hourly;
+  REFRESH MATERIALIZED VIEW CONCURRENTLY public.readings_daily;
   ```
+- **Supabase Scheduled Functions fallback**: If the `pg_cron` extension is disabled or unavailable, schedule view refreshes using a scheduled Supabase Edge Function or an external cron service targeting a custom RPC function.

@@ -1,7 +1,7 @@
 """MQTT Subscriber Service.
 
 Subscribes to ThingSpeak MQTT broker to receive live water quality readings,
-validates them, inserts them into the TimescaleDB hypertable, and handles
+validates them, inserts them into the PostgreSQL readings table, and handles
 reconnections with exponential backoff and REST API catch-up.
 """
 

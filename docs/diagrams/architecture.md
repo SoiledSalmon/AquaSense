@@ -32,7 +32,7 @@ graph TD
     subgraph Infrastructure [Data & Auth Store]
         style Infrastructure fill:#022c22,stroke:#064e3b,color:#f8fafc
         SupaAuth[Supabase Auth]
-        Timescale[(PostgreSQL + TimescaleDB)]
+        PostgreSQL[(PostgreSQL 17 DB Cluster)]
         TSBroker[ThingSpeak MQTT Broker]
     end
 
@@ -45,7 +45,7 @@ graph TD
     Ingestion -- Async Handoff --> Services
     Services --> ML
     Services --> Repos
-    Repos -- SQL Queries --> Timescale
+    Repos -- SQL Queries --> PostgreSQL
     API -- JWT verification --> SupaAuth
     TSBroker -- MQTT Sub --> Ingestion
 ```
@@ -63,7 +63,7 @@ sequenceDiagram
     participant TS as ThingSpeak Broker
     participant SUB as MQTT Subscriber (FastAPI)
     participant ML as ML Pipeline (FastAPI)
-    participant DB as TimescaleDB
+    participant DB as PostgreSQL
     participant SSE as SSE Manager (FastAPI)
     participant UI as Next.js Client Dashboard
 

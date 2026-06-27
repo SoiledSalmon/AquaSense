@@ -19,7 +19,7 @@ AquaSense is an end-to-end IoT platform for real-time water quality tracking, st
 *   **Backend:** FastAPI, `aiomqtt` (MQTT Client), `structlog` (Structured Logging), `slowapi` (Rate Limiting), Pydantic v2 (Validation), `jose` (JWT parsing).
 *   **Machine Learning:** XGBoost, Scikit-learn (Isolation Forest), Pandas, NumPy, Joblib, Custom Pure-Python Exact SHAP Explainer.
 *   **Frontend:** Next.js 16/15 (App Router), Tailwind CSS v4, Lucide Icons, Recharts (Telemetry Analytics).
-*   **Database:** Supabase PostgreSQL 15, TimescaleDB (Hypertables, Continuous Aggregates).
+*   **Database:** Supabase PostgreSQL 17 (Materialized Views, pg_cron).
 *   **IoT Firmware:** Arduino/C++ for ESP32, WiFi client, ThingSpeak HTTP Post.
 
 ---
@@ -42,7 +42,7 @@ AquaSense/
 │   │   └── main.py            # FastAPI entry point & lifespan manager
 │   ├── migrations/            # Consolidated SQL schemas
 │   │   ├── relational/        # Users, alerts, and Relational tables
-│   │   └── timescaledb/       # Telemetry Hypertables & Continuous Aggregates
+│   │   └── timescaledb/       # Plain PostgreSQL time-series schema & materialized views
 │   ├── tests/                 # Full unit & integration pytest suite
 │   ├── requirements.txt       # Python dependencies
 │   └── .env.example           # Backend environment template
@@ -72,12 +72,12 @@ AquaSense/
 ---
 
 ### 1. Database & Authentication Setup
-AquaSense relies on Supabase (Postgres 15) and the TimescaleDB extension.
+AquaSense relies on Supabase (Postgres 17) and plain PostgreSQL time-series indexes/views.
 
-1.  Create a project on the [Supabase Dashboard](https://supabase.com). Ensure you select **PostgreSQL 15** (TimescaleDB extension is not supported by Supabase on PostgreSQL 16+).
+1.  Create a project on the [Supabase Dashboard](https://supabase.com). The default **PostgreSQL 17** engine is recommended.
 2.  Open the Supabase SQL Editor and execute the SQL migrations in order:
     *   **Relational Schema:** Run the scripts in [backend/migrations/relational/](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/relational/) sequentially.
-    *   **TimescaleDB Schema:** Run the scripts in [backend/migrations/timescaledb/](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/timescaledb/) sequentially.
+    *   **Time-Series Schema:** Run the scripts in [backend/migrations/timescaledb/](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/timescaledb/) sequentially.
 3.  Note down the project **URL**, **Anon API key**, **Service Role API key**, and **JWT Secret**.
 
 ---
