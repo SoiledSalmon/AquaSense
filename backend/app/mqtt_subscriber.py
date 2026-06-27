@@ -7,6 +7,7 @@ reconnections with exponential backoff and REST API catch-up.
 
 import asyncio
 import json
+import ssl
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Set, Dict
 
@@ -256,11 +257,16 @@ async def run_mqtt_subscriber(app):
 
     while True:
         try:
+            context = ssl.create_default_context()
             async with aiomqtt.Client(
                 hostname="mqtt3.thingspeak.com",
-                port=1883,
+                port=443,
                 username=settings.THINGSPEAK_MQTT_USER,
                 password=settings.THINGSPEAK_MQTT_API_KEY,
+                identifier=settings.THINGSPEAK_MQTT_USER,
+                transport="websockets",
+                websocket_path="/mqtt",
+                tls_context=context,
                 timeout=15.0,
             ) as client:
                 logger.info("mqtt_connected")

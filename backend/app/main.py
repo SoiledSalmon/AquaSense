@@ -4,6 +4,20 @@ Initializes the app, configures CORS, rate limiting, exception handlers,
 and mounts routers.
 """
 
+import sys
+import asyncio
+
+# Crucial fix for aiomqtt on Windows:
+if sys.platform == "win32":
+    # Uvicorn on Windows instantiates ProactorEventLoop directly, bypassing the policy.
+    # We override ProactorEventLoop to force SelectorEventLoop, which is required by aiomqtt.
+    asyncio.ProactorEventLoop = asyncio.SelectorEventLoop
+    
+    selector_policy = asyncio.WindowsSelectorEventLoopPolicy()
+    asyncio.set_event_loop_policy(selector_policy)
+    # Prevent uvicorn from overriding this policy during startup
+    asyncio.set_event_loop_policy = lambda policy: None
+
 from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI, Request
