@@ -39,7 +39,7 @@ async def get_current_user(
 
     try:
         supabase = request.app.state.supabase
-        auth_response = supabase.auth.refresh_session(refresh_token)
+        auth_response = await supabase.auth.refresh_session(refresh_token)
         session = auth_response.session
         user = auth_response.user
 

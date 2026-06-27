@@ -91,6 +91,7 @@ export async function signup(body: any) {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -101,6 +102,7 @@ export async function login(body: any) {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -110,6 +112,7 @@ export async function logout() {
   const res = await fetch(`${API_URL}/api/auth/logout`, {
     method: 'POST',
     headers,
+    credentials: 'include',
   })
 
   // Propagate cookie deletion
@@ -132,6 +135,7 @@ export async function getMe() {
   const res = await fetch(`${API_URL}/api/auth/me`, {
     method: 'GET',
     headers,
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -142,6 +146,7 @@ export async function updateProfile(body: any) {
     method: 'PATCH',
     headers,
     body: JSON.stringify(body),
+    credentials: 'include',
   })
   return handleResponse(res)
 }

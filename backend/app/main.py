@@ -24,7 +24,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from supabase import create_client
+from supabase import create_async_client
 
 from app.core.logging import setup_logging
 setup_logging()
@@ -60,13 +60,13 @@ async def lifespan(app: FastAPI):
         logger.error("app_model_loading_failed_at_startup", error=str(e))
 
     # Initialize Supabase client (anon role)
-    app.state.supabase = create_client(
+    app.state.supabase = await create_async_client(
         settings.SUPABASE_URL,
         settings.SUPABASE_KEY
     )
 
     # Initialize Supabase admin client (service role)
-    app.state.supabase_admin = create_client(
+    app.state.supabase_admin = await create_async_client(
         settings.SUPABASE_URL,
         settings.SUPABASE_SERVICE_ROLE_KEY
     )

@@ -5,6 +5,7 @@ XGBoost inference, SHAP explanations, Isolation Forest anomaly detection,
 and recommendation generation. Handles database persistence and alerts.
 """
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 import structlog
@@ -71,14 +72,14 @@ class MLPipelineService:
             smoothed_features = compute_ewma_features(validated_inputs, history)
             
             # 4. XGBoost Inference (on smoothed features)
-            label, score, probs = run_xgb_inference(smoothed_features)
+            label, score, probs = await asyncio.to_thread(run_xgb_inference, smoothed_features)
             result["label"] = label
             
             # 5. Isolation Forest Anomaly Detection (on smoothed features)
-            is_anomaly, anomaly_score = detect_anomaly(smoothed_features)
+            is_anomaly, anomaly_score = await asyncio.to_thread(detect_anomaly, smoothed_features)
             
             # 6. SHAP Explanations (for the predicted class)
-            shap_values = compute_exact_shap(smoothed_features, label)
+            shap_values = await asyncio.to_thread(compute_exact_shap, smoothed_features, label)
             
             # 7. Recommendation and Risk Level Generation
             recommendation, risk_level = generate_recommendation_and_risk(

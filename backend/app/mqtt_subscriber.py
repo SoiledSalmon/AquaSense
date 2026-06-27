@@ -55,7 +55,7 @@ _channel_to_user_map: Dict[str, dict] = {}
 async def get_active_users(supabase_admin) -> list[dict]:
     """Fetch all users who have a channel_id configured."""
     try:
-        response = (
+        response = await (
             supabase_admin.table("users")
             .select("id, channel_id, ts_api_key")
             .not_.is_("channel_id", "null")

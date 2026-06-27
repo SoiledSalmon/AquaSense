@@ -26,7 +26,7 @@ class AlertRepository:
         if isinstance(data.get("resolved_at"), datetime):
             data["resolved_at"] = data["resolved_at"].isoformat()
 
-        response = (
+        response = await (
             self._client.table("alerts")
             .insert(data)
             .execute()
@@ -51,12 +51,12 @@ class AlertRepository:
             # Active means either not acknowledged or not resolved
             query = query.or_("is_acknowledged.eq.false,is_resolved.eq.false")
 
-        response = query.order("timestamp", desc=True).limit(limit).execute()
+        response = await query.order("timestamp", desc=True).limit(limit).execute()
         return response.data or []
 
     async def get_alert(self, alert_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve a single alert by ID, verifying user ownership."""
-        response = (
+        response = await (
             self._client.table("alerts")
             .select("*")
             .eq("id", alert_id)
@@ -76,7 +76,7 @@ class AlertRepository:
             else:
                 formatted_updates[k] = v
 
-        response = (
+        response = await (
             self._client.table("alerts")
             .update(formatted_updates)
             .eq("id", alert_id)
@@ -90,7 +90,7 @@ class AlertRepository:
 
     async def get_latest_alert_by_category(self, user_id: str, category: str) -> Optional[Dict[str, Any]]:
         """Get the most recent alert of a specific category for a user (used for cooldown checks)."""
-        response = (
+        response = await (
             self._client.table("alerts")
             .select("*")
             .eq("user_id", user_id)

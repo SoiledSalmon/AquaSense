@@ -24,7 +24,7 @@ class ReadingsRepository:
         if "id" in data and data["id"] is None:
             data.pop("id")
 
-        response = (
+        response = await (
             self._client.table("readings")
             .insert(data)
             .execute()
@@ -36,7 +36,7 @@ class ReadingsRepository:
 
     async def get_latest_reading_timestamp(self, user_id: str) -> datetime | None:
         """Get the timestamp of the latest reading for a user."""
-        response = (
+        response = await (
             self._client.table("readings")
             .select("timestamp")
             .eq("user_id", user_id)
@@ -52,7 +52,7 @@ class ReadingsRepository:
 
     async def get_latest_reading(self, user_id: str) -> dict | None:
         """Get the latest reading + computed metrics for a user."""
-        response = (
+        response = await (
             self._client.table("readings")
             .select("*")
             .eq("user_id", user_id)
@@ -66,7 +66,7 @@ class ReadingsRepository:
 
     async def get_hourly_readings(self, user_id: str, limit: int = 24) -> list[dict]:
         """Get hourly aggregated readings for the user, in chronological order."""
-        response = (
+        response = await (
             self._client.table("readings_hourly")
             .select("*")
             .eq("user_id", user_id)
@@ -80,7 +80,7 @@ class ReadingsRepository:
 
     async def get_daily_readings(self, user_id: str, limit: int = 30) -> list[dict]:
         """Get daily aggregated readings for the user, in chronological order."""
-        response = (
+        response = await (
             self._client.table("readings_daily")
             .select("*")
             .eq("user_id", user_id)
@@ -94,7 +94,7 @@ class ReadingsRepository:
 
     async def update_reading_ml(self, reading_id: str, wqi_score: float, label: str) -> dict:
         """Update a reading row with computed WQI score and classification label."""
-        response = (
+        response = await (
             self._client.table("readings")
             .update({"wqi_score": wqi_score, "label": label})
             .eq("id", reading_id)
@@ -110,7 +110,7 @@ class ReadingsRepository:
         data = {**result_data}
         if isinstance(data.get("timestamp"), datetime):
             data["timestamp"] = data["timestamp"].isoformat()
-        response = (
+        response = await (
             self._client.table("ml_results")
             .insert(data)
             .execute()
@@ -125,7 +125,7 @@ class ReadingsRepository:
         data = {**alert_data}
         if isinstance(data.get("timestamp"), datetime):
             data["timestamp"] = data["timestamp"].isoformat()
-        response = (
+        response = await (
             self._client.table("alerts")
             .insert(data)
             .execute()
@@ -137,7 +137,7 @@ class ReadingsRepository:
 
     async def get_recent_readings(self, user_id: str, limit: int = 20) -> list[dict]:
         """Get recent raw readings for the user (returned in chronological order)."""
-        response = (
+        response = await (
             self._client.table("readings")
             .select("ph, tds, turbidity, timestamp")
             .eq("user_id", user_id)

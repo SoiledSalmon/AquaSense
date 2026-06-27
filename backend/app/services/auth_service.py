@@ -37,7 +37,7 @@ class AuthService:
         skill rule: user_metadata is user-writable and untrusted).
         """
         try:
-            auth_response = self._admin.auth.sign_up(
+            auth_response = await self._admin.auth.sign_up(
                 {
                     "email": email,
                     "password": password,
@@ -55,7 +55,7 @@ class AuthService:
             raise UserAlreadyExistsError()
 
         # Set role in app_metadata (authoritative source for permissions)
-        self._admin.auth.admin.update_user_by_id(
+        await self._admin.auth.admin.update_user_by_id(
             user.id,
             {"app_metadata": {"role": "user"}},
         )
@@ -67,7 +67,16 @@ class AuthService:
             "full_name": full_name,
             "role": "user",
         }
-        await self._users.create_user(user_data)
+        try:
+            await self._users.create_user(user_data)
+        except Exception as exc:
+            logger.error("signup_profile_creation_failed", user_id=user.id, error=str(exc))
+            try:
+                await self._admin.auth.admin.delete_user(user.id)
+                logger.info("signup_rollback_success", user_id=user.id)
+            except Exception as rollback_exc:
+                logger.critical("signup_rollback_failed", user_id=user.id, error=str(rollback_exc))
+            raise exc
 
         session = auth_response.session
         logger.info("user_signed_up", user_id=user.id)
@@ -81,7 +90,7 @@ class AuthService:
     async def login(self, email: str, password: str) -> dict:
         """Authenticate via Supabase Auth and return tokens + profile."""
         try:
-            auth_response = self._admin.auth.sign_in_with_password(
+            auth_response = await self._admin.auth.sign_in_with_password(
                 {"email": email, "password": password}
             )
         except Exception as exc:
@@ -119,7 +128,7 @@ class AuthService:
         """
         try:
             # Sign out all sessions via admin API
-            self._admin.auth.admin.sign_out(user_id, scope="global")
+            await self._admin.auth.admin.sign_out(user_id, scope="global")
         except Exception:
             # If sign-out fails, log but don't block (cookies get cleared
             # on the response anyway)

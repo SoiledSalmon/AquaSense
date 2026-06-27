@@ -44,6 +44,15 @@ class ProfileUpdateError(Exception):
         super().__init__(self.detail)
 
 
+class ProfileCreationError(Exception):
+    """Raised when profile creation fails after auth signup."""
+
+    def __init__(self, user_id: str, detail: str = "Failed to create user profile"):
+        self.user_id = user_id
+        self.detail = detail
+        super().__init__(f"{detail} for user {user_id}")
+
+
 # ── Handler Registration ─────────────────────────────
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -84,3 +93,13 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=400,
             content={"error": "bad_request", "message": exc.detail},
         )
+
+    @app.exception_handler(ProfileCreationError)
+    async def _profile_creation(
+        _request: Request, exc: ProfileCreationError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "internal_error", "message": exc.detail},
+        )
+

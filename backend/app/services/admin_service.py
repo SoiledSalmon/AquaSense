@@ -70,7 +70,7 @@ class AdminService:
 
         # 2. Update Supabase Auth app_metadata via admin client
         try:
-            self._admin.auth.admin.update_user_by_id(
+            await self._admin.auth.admin.update_user_by_id(
                 user_id,
                 {"app_metadata": {"role": new_role}},
             )
@@ -96,14 +96,14 @@ class AdminService:
 
         try:
             # Revoke all current tokens/sessions
-            self._admin.auth.admin.sign_out(user_id, scope="global")
+            await self._admin.auth.admin.sign_out(user_id, scope="global")
         except Exception as exc:
             # Log failure to sign out but proceed with deletion
             logger.warning("admin_service_sign_out_before_delete_failed", user_id=user_id, error=str(exc))
 
         try:
             # Delete user via admin client
-            self._admin.auth.admin.delete_user(user_id)
+            await self._admin.auth.admin.delete_user(user_id)
             logger.info("user_permanently_deleted", user_id=user_id)
         except Exception as exc:
             logger.error("admin_service_delete_user_failed", user_id=user_id, error=str(exc))
@@ -235,7 +235,7 @@ class AdminService:
         db_status = "healthy"
         try:
             # Ping database with a simple query
-            self._supabase.table("users").select("id").limit(1).execute()
+            await self._supabase.table("users").select("id").limit(1).execute()
         except Exception as e:
             logger.error("database_health_check_failed", error=str(e))
             db_status = "unhealthy"

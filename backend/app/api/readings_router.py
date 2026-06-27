@@ -110,7 +110,7 @@ async def stream_telemetry(
 
         try:
             # Query unread alerts (fail-safe fallback if table is missing)
-            alerts_response = (
+            alerts_response = await (
                 repo._client.table("alerts")
                 .select("*")
                 .eq("user_id", user_id)

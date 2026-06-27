@@ -44,6 +44,7 @@ export async function getAdminStats() {
     method: 'GET',
     headers,
     cache: 'no-store',
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -71,6 +72,7 @@ export async function getAdminUsers(params: GetUsersParams = {}) {
     method: 'GET',
     headers,
     cache: 'no-store',
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -81,6 +83,7 @@ export async function getAdminUser(userId: string) {
     method: 'GET',
     headers,
     cache: 'no-store',
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -91,6 +94,7 @@ export async function updateUserRole(userId: string, role: 'user' | 'admin') {
     method: 'PATCH',
     headers,
     body: JSON.stringify({ role }),
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -100,6 +104,7 @@ export async function deleteUser(userId: string) {
   const res = await fetch(`${API_URL}/api/admin/users/${userId}`, {
     method: 'DELETE',
     headers,
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -123,6 +128,7 @@ export async function getAdminReadings(params: GetReadingsParams = {}) {
     method: 'GET',
     headers,
     cache: 'no-store',
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -150,6 +156,7 @@ export async function getAdminAlerts(params: GetAlertsParams = {}) {
     method: 'GET',
     headers,
     cache: 'no-store',
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -175,6 +182,7 @@ export async function getAdminML(params: GetMLParams = {}) {
     method: 'GET',
     headers,
     cache: 'no-store',
+    credentials: 'include',
   })
   return handleResponse(res)
 }

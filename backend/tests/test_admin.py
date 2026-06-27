@@ -103,7 +103,11 @@ def mock_supabase():
 
 @pytest.fixture
 def mock_supabase_admin():
-    return MagicMock()
+    admin = MagicMock()
+    admin.auth.admin.update_user_by_id = AsyncMock()
+    admin.auth.admin.sign_out = AsyncMock()
+    admin.auth.admin.delete_user = AsyncMock()
+    return admin
 
 
 @pytest.fixture
@@ -124,7 +128,7 @@ async def test_update_user_role_success(admin_service, mock_supabase_admin):
     mock_repo.get_user_by_id = AsyncMock(return_value={"id": "user-123", "role": "user"})
     mock_repo.update_user_role = AsyncMock(return_value={"id": "user-123", "role": "admin"})
     
-    mock_supabase_admin.auth.admin.update_user_by_id = MagicMock()
+    mock_supabase_admin.auth.admin.update_user_by_id = AsyncMock()
 
     result = await service.update_user_role("user-123", "admin")
 
@@ -150,8 +154,8 @@ async def test_delete_user_success(admin_service, mock_supabase_admin):
     service, mock_repo = admin_service
 
     mock_repo.get_user_by_id = AsyncMock(return_value={"id": "user-123"})
-    mock_supabase_admin.auth.admin.sign_out = MagicMock()
-    mock_supabase_admin.auth.admin.delete_user = MagicMock()
+    mock_supabase_admin.auth.admin.sign_out = AsyncMock()
+    mock_supabase_admin.auth.admin.delete_user = AsyncMock()
 
     await service.delete_user("user-123")
 
@@ -167,7 +171,7 @@ async def test_admin_repository_get_users(mock_supabase):
     repo = AdminRepository(mock_supabase)
     
     mock_execute = MagicMock()
-    mock_execute.execute = MagicMock(return_value=MagicMock(data=[{"id": "u1", "email": "test@test.com"}]))
+    mock_execute.execute = AsyncMock(return_value=MagicMock(data=[{"id": "u1", "email": "test@test.com"}]))
     
     mock_table = MagicMock()
     mock_table.select = MagicMock(return_value=mock_table)

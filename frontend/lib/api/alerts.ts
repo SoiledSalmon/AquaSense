@@ -44,6 +44,7 @@ export async function getAlerts(
     method: 'GET',
     headers,
     cache: 'no-store',
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -53,6 +54,7 @@ export async function acknowledgeAlert(alertId: string) {
   const res = await fetch(`${API_URL}/api/alerts/${alertId}/acknowledge`, {
     method: 'POST',
     headers,
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -62,6 +64,7 @@ export async function resolveAlert(alertId: string) {
   const res = await fetch(`${API_URL}/api/alerts/${alertId}/resolve`, {
     method: 'POST',
     headers,
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -71,6 +74,7 @@ export async function readAlert(alertId: string) {
   const res = await fetch(`${API_URL}/api/alerts/${alertId}/read`, {
     method: 'POST',
     headers,
+    credentials: 'include',
   })
   return handleResponse(res)
 }

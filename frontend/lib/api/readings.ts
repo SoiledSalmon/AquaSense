@@ -41,6 +41,7 @@ export async function getLatestReading() {
     method: 'GET',
     headers,
     cache: 'no-store',
+    credentials: 'include',
   })
   return handleResponse(res)
 }
@@ -51,6 +52,7 @@ export async function getReadingsHistory(range: '24h' | '7d' | '30d') {
     method: 'GET',
     headers,
     cache: 'no-store',
+    credentials: 'include',
   })
   return handleResponse(res)
 }

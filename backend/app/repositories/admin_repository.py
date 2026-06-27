@@ -35,7 +35,7 @@ class AdminRepository:
 
         offset = (page - 1) * limit
         query = query.order(sort_by, desc=(order == "desc")).range(offset, offset + limit - 1)
-        response = query.execute()
+        response = await query.execute()
         return response.data or []
 
     async def get_users_count(self, search: Optional[str] = None, role: Optional[str] = None) -> int:
@@ -47,23 +47,25 @@ class AdminRepository:
         if search:
             query = query.or_(f"email.ilike.%{search}%,full_name.ilike.%{search}%")
 
-        response = query.limit(1).execute()
+        response = await query.limit(1).execute()
         return response.count or 0
 
     async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Fetch a single user profile."""
-        response = (
+        response = await (
             self._client.table("users")
             .select("*")
             .eq("id", user_id)
             .maybe_single()
             .execute()
         )
-        return response.data
+        # postgrest-py's maybe_single() returns None directly (instead of a response
+        # object with empty data) when zero rows match the query.
+        return response.data if response else None
 
     async def update_user_role(self, user_id: str, role: str) -> Dict[str, Any]:
         """Update a user's role in the public.users table."""
-        response = (
+        response = await (
             self._client.table("users")
             .update({"role": role})
             .eq("id", user_id)
@@ -91,7 +93,7 @@ class AdminRepository:
 
         offset = (page - 1) * limit
         query = query.order("timestamp", desc=True).range(offset, offset + limit - 1)
-        response = query.execute()
+        response = await query.execute()
         return response.data or []
 
     async def get_readings_count(self, user_id: Optional[str] = None, label: Optional[str] = None) -> int:
@@ -103,7 +105,7 @@ class AdminRepository:
         if label and label != "all":
             query = query.eq("label", label)
 
-        response = query.limit(1).execute()
+        response = await query.limit(1).execute()
         return response.count or 0
 
     async def get_alerts(
@@ -129,7 +131,7 @@ class AdminRepository:
 
         offset = (page - 1) * limit
         query = query.order("timestamp", desc=True).range(offset, offset + limit - 1)
-        response = query.execute()
+        response = await query.execute()
         return response.data or []
 
     async def get_alerts_count(
@@ -151,7 +153,7 @@ class AdminRepository:
         if is_resolved is not None:
             query = query.eq("is_resolved", is_resolved)
 
-        response = query.limit(1).execute()
+        response = await query.limit(1).execute()
         return response.count or 0
 
     async def get_ml_predictions(
@@ -174,7 +176,7 @@ class AdminRepository:
 
         offset = (page - 1) * limit
         query = query.order("timestamp", desc=True).range(offset, offset + limit - 1)
-        response = query.execute()
+        response = await query.execute()
         return response.data or []
 
     async def get_ml_predictions_count(
@@ -193,7 +195,7 @@ class AdminRepository:
         if is_anomaly is not None:
             query = query.eq("is_anomaly", is_anomaly)
 
-        response = query.limit(1).execute()
+        response = await query.limit(1).execute()
         return response.count or 0
 
     async def get_stats_rpc(self) -> Optional[Dict[str, Any]]:
@@ -202,7 +204,7 @@ class AdminRepository:
         Returns None if the RPC does not exist or fails.
         """
         try:
-            response = self._client.rpc("get_admin_dashboard_stats").execute()
+            response = await self._client.rpc("get_admin_dashboard_stats").execute()
             return response.data
         except Exception as e:
             logger.warning("get_stats_rpc_failed", error=str(e))
@@ -213,20 +215,20 @@ class AdminRepository:
         logger.info("get_stats_fallback_running")
 
         # 1. Total readings & Active users
-        readings_cnt_res = self._client.table("readings").select("id, user_id", count="exact").execute()
+        readings_cnt_res = await self._client.table("readings").select("id, user_id", count="exact").execute()
         total_readings = readings_cnt_res.count or 0
         
         # Calculate distinct active users
-        active_users_res = self._client.table("users").select("id", count="exact").not_.is_("channel_id", "null").execute()
+        active_users_res = await self._client.table("users").select("id", count="exact").not_.is_("channel_id", "null").execute()
         active_users = active_users_res.count or 0
 
         # 2. Unsafe events
-        unsafe_cnt_res = self._client.table("readings").select("id", count="exact").eq("label", "unsafe").execute()
+        unsafe_cnt_res = await self._client.table("readings").select("id", count="exact").eq("label", "unsafe").execute()
         unsafe_events = unsafe_cnt_res.count or 0
 
         # 3. Average WQI
         # Query recent 1000 readings to calculate avg WQI defensively
-        wqi_res = self._client.table("readings").select("wqi_score").order("timestamp", desc=True).limit(1000).execute()
+        wqi_res = await self._client.table("readings").select("wqi_score").order("timestamp", desc=True).limit(1000).execute()
         wqi_scores = [r["wqi_score"] for r in (wqi_res.data or []) if r.get("wqi_score") is not None]
         avg_wqi = sum(wqi_scores) / len(wqi_scores) if wqi_scores else 0.0
 
@@ -235,19 +237,19 @@ class AdminRepository:
         yesterday = (now - timedelta(days=1)).isoformat()
         week_ago = (now - timedelta(days=7)).isoformat()
 
-        alerts_24h = self._client.table("alerts").select("id", count="exact").gte("timestamp", yesterday).execute().count or 0
-        alerts_7d = self._client.table("alerts").select("id", count="exact").gte("timestamp", week_ago).execute().count or 0
+        alerts_24h = (await self._client.table("alerts").select("id", count="exact").gte("timestamp", yesterday).execute()).count or 0
+        alerts_7d = (await self._client.table("alerts").select("id", count="exact").gte("timestamp", week_ago).execute()).count or 0
 
         # 5. ML distribution
-        anomaly_count = self._client.table("ml_results").select("id", count="exact").eq("is_anomaly", True).execute().count or 0
-        normal_count = self._client.table("ml_results").select("id", count="exact").eq("is_anomaly", False).execute().count or 0
+        anomaly_count = (await self._client.table("ml_results").select("id", count="exact").eq("is_anomaly", True).execute()).count or 0
+        normal_count = (await self._client.table("ml_results").select("id", count="exact").eq("is_anomaly", False).execute()).count or 0
 
-        low_risk = self._client.table("ml_results").select("id", count="exact").eq("risk_level", "low").execute().count or 0
-        medium_risk = self._client.table("ml_results").select("id", count="exact").eq("risk_level", "medium").execute().count or 0
-        high_risk = self._client.table("ml_results").select("id", count="exact").eq("risk_level", "high").execute().count or 0
+        low_risk = (await self._client.table("ml_results").select("id", count="exact").eq("risk_level", "low").execute()).count or 0
+        medium_risk = (await self._client.table("ml_results").select("id", count="exact").eq("risk_level", "medium").execute()).count or 0
+        high_risk = (await self._client.table("ml_results").select("id", count="exact").eq("risk_level", "high").execute()).count or 0
 
         # 6. Trends (Last 7 days daily averages)
-        trends_res = self._client.table("readings_daily").select("bucket, avg_wqi").order("bucket", desc=True).limit(30).execute()
+        trends_res = await self._client.table("readings_daily").select("bucket, avg_wqi").order("bucket", desc=True).limit(30).execute()
         trends_data = trends_res.data or []
         trends_data.reverse()
 
