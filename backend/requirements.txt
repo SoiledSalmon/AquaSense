@@ -18,10 +18,3 @@ scikit-learn>=1.3.0,<2.0.0
 joblib>=1.3.0,<2.0.0
 # Note: shap package is omitted to avoid compiler dependencies on Python 3.14.
 # We implement a mathematically exact pure-Python SHAP Tree/Kernel explainer.
-
-# ── Testing ───────────────────────────────────────────
-pytest>=9.0.3,<10.0.0
-pytest-asyncio>=0.24.0,<1.0.0
-
-# ── Security Audit ────────────────────────────────────
-pip-audit>=2.7.0,<3.0.0
