@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const hasAccessToken = request.cookies.has('access_token')
   const hasRefreshToken = request.cookies.has('refresh_token')
   const isAuthenticated = hasAccessToken || hasRefreshToken
