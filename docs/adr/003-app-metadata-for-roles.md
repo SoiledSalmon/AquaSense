@@ -1,4 +1,4 @@
-# 2. Roles Stored in app_metadata, Not user_metadata
+# 3. Roles Stored in app_metadata, Not user_metadata
 
 **Status:** Accepted  
 **Date:** 2026-06-26

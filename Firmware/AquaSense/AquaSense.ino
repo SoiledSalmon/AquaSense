@@ -5,15 +5,15 @@
 // WiFi Credentials
 //====================================================
 
-const char* ssid = "vivo Y73";
-const char* password = "12345678";
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
 
 //====================================================
 // ThingSpeak
 //====================================================
 
-unsigned long channelID = 3406577;
-const char* writeAPIKey = "KWT3638R6HM9UYXQ";
+unsigned long channelID = 0; // Replace with your Channel ID
+const char* writeAPIKey = "YOUR_THINGSPEAK_WRITE_API_KEY";
 
 WiFiClient client;
 

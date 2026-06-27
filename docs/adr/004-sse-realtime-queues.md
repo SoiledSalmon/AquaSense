@@ -1,4 +1,4 @@
-# Architecture Decision Record: Server-Sent Events (SSE) Real-Time Streaming & Per-User Queues
+# 4. Server-Sent Events (SSE) Real-Time Streaming & Per-User Queues
 
 ## Context
 In Phase 3 of AquaSense, we need to push real-time telemetry updates and anomaly alerts directly from the backend to the browser client immediately upon receiving them from the ThingSpeak MQTT broker. The original dashboard in v1 HTTP polled the API every 15–30 seconds. We need a unidirectional, real-time push mechanism that is highly efficient, scales easily, and plays nicely with the Next.js 15 frontend architecture.

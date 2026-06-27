@@ -1,4 +1,4 @@
-# ADR 004: Pure-Python Exact SHAP Explainer
+# 5. Pure-Python Exact SHAP Explainer
 
 ## Status
 Approved

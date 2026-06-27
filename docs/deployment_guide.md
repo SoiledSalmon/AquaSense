@@ -32,13 +32,13 @@ The system consists of three main hosting components:
 Run the following migration scripts in order. You can execute them via the Supabase SQL Editor or through the Supabase CLI.
 
 1. **Relational Core Schema**:
-   - Run [001_create_users_table.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/001_create_users_table.sql) to create the profiles table with Row Level Security.
-   - Run [002_create_alerts_and_ml_tables.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/002_create_alerts_and_ml_tables.sql) to create relational alerts, ML predictions, and training audit log schemas.
-   - Run [003_update_alerts_table.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/003_update_alerts_table.sql) to support severity, category, and acknowledgement statuses.
+   - Run [001_create_users_table.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/relational/001_create_users_table.sql) to create the profiles table with Row Level Security.
+   - Run [002_create_alerts_and_ml_tables.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/relational/002_create_alerts_and_ml_tables.sql) to create relational alerts, ML predictions, and training audit log schemas.
+   - Run [003_update_alerts_table.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/relational/003_update_alerts_table.sql) to support severity, category, and acknowledgement statuses.
 
 2. **TimescaleDB Time-Series Schema**:
-   - Run [001_create_readings_hypertable.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/db/migrations/001_create_readings_hypertable.sql) to enable the `timescaledb` extension, create the telemetry table, partition it into chunks, and add the 7-day compression policy.
-   - Run [002_create_continuous_aggregates.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/db/migrations/002_create_continuous_aggregates.sql) to establish hourly/daily pre-computed aggregates and configure automatic refresh policies.
+   - Run [001_create_readings_hypertable.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/timescaledb/001_create_readings_hypertable.sql) to enable the `timescaledb` extension, create the telemetry table, partition it into chunks, and add the 7-day compression policy.
+   - Run [002_create_continuous_aggregates.sql](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/timescaledb/002_create_continuous_aggregates.sql) to establish hourly/daily pre-computed aggregates and configure automatic refresh policies.
 
 ---
 

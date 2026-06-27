@@ -1,4 +1,4 @@
-# Architecture Decision Record: MQTT Reconnect & Catch-Up Strategy
+# 2. MQTT Reconnect & Catch-Up Strategy
 
 ## Context
 ThingSpeak MQTT broker (`mqtt3.thingspeak.com`) holds a persistent connection for real-time ingestion. However, network blips, server updates, or Railway service restarts can disconnect the client. During the disconnect window, the ESP32 device will continue sending data to ThingSpeak (via HTTP POST) which the backend will miss. We need a way to ensure connection resilience and zero data loss.
