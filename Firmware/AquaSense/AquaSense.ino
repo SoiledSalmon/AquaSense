@@ -1,326 +1,247 @@
 #include <WiFi.h>
 #include <ThingSpeak.h>
 
-//====================================================
+// -------------------------
 // WiFi Credentials
-//====================================================
-
+// -------------------------
 const char* ssid = "Ananth's Oppo A17";
 const char* password = "Anipollu123";
 
-//====================================================
-// ThingSpeak
-//====================================================
-
-unsigned long channelID = 0; // Replace with your Channel ID
-const char* writeAPIKey = "KWT3638R6HM9UYXQ";
+// -------------------------
+// ThingSpeak Details
+// -------------------------
+unsigned long channelID = 3406577;
+const char * writeAPIKey = "KWT3638R6HM9UYXQ";
 
 WiFiClient client;
 
-//====================================================
-// Sensor Pins
-//====================================================
-
+// -------------------------
+// Sensor Pins (ESP32 ADC1 channels - safe to use alongside WiFi)
+// -------------------------
 const int phSensorPin = 34;
 const int turbidityPin = 36;
 const int tdsPin = 32;
 
-//====================================================
-// Constants
-//====================================================
+// -------------------------
+// Turbidity sensor: HARDWARE FIX REQUIRED
+// -------------------------
+// This turbidity sensor outputs 0-4.5V (clear water reads ~4.1-4.2V at 5V supply).
+// The ESP32 ADC is only rated for 0-3.3V. Wired directly, the pin reads its
+// maximum code (clipped) for any input above ~3.3V - which covers clear water
+// AND mildly turbid water. This is almost certainly why your readings "don't
+// change at all": you've only been seeing the clipped ceiling.
+//
+// Fix: add a voltage divider between the sensor's OUT pin and GPIO36:
+//
+//   Sensor OUT ---[R1 = 10k]---+---[R2 = 20k]--- GND
+//                               |
+//                           ESP32 GPIO36
+//
+// This scales the sensor's 0-4.5V down to a safe 0-3.0V at the ADC pin.
+// The code below multiplies the measured voltage back up by the same ratio
+// to recover the sensor's true output voltage before applying the NTU formula.
+// If you use different resistors, just update the two values below.
+const float DIVIDER_R1 = 10000.0; // ohms, sensor OUT -> ADC node
+const float DIVIDER_R2 = 20000.0; // ohms, ADC node -> GND
+const float TURBIDITY_DIVIDER_RATIO = DIVIDER_R2 / (DIVIDER_R1 + DIVIDER_R2); // ~0.667
 
-const float VREF = 3.3;
-const int ADC_RESOLUTION = 4095;
+// TDS sensor outputs only 0-2.3V max, which already fits safely inside the
+// ESP32's 0-3.3V ADC range, so no divider is needed for it.
 
-const float waterTemperature = 29.0;
-
-//====================================================
-// TDS Median Filter
-//====================================================
-
-#define SCOUNT 30
-
-int analogBuffer[SCOUNT];
-int analogBufferTemp[SCOUNT];
-
-int getMedianNum(int bArray[], int iFilterLen)
-{
-    int bTab[iFilterLen];
-
-    for (int i = 0; i < iFilterLen; i++)
-        bTab[i] = bArray[i];
-
-    int temp;
-
-    for (int j = 0; j < iFilterLen - 1; j++)
-    {
-        for (int i = 0; i < iFilterLen - j - 1; i++)
-        {
-            if (bTab[i] > bTab[i + 1])
-            {
-                temp = bTab[i];
-                bTab[i] = bTab[i + 1];
-                bTab[i + 1] = temp;
-            }
-        }
-    }
-
-    if ((iFilterLen & 1) > 0)
-        return bTab[(iFilterLen - 1) / 2];
-    else
-        return (bTab[iFilterLen / 2] +
-                bTab[iFilterLen / 2 - 1]) / 2;
-}
-
-//====================================================
-// Average ADC Reading
-//====================================================
+// -------------------------
+// Utility Functions
+// -------------------------
 
 int getAverageReading(int analogPin, int samples = 10)
 {
-    long sum = 0;
+  long sum = 0;
 
-    for (int i = 0; i < samples; i++)
-    {
-        sum += analogRead(analogPin);
-        delay(10);
-    }
+  for (int i = 0; i < samples; i++)
+  {
+    sum += analogRead(analogPin);
+    delay(10);
+  }
 
-    return sum / samples;
+  return sum / samples;
 }
 
-//====================================================
-// pH Calibration
-//====================================================
+// Averages analogReadMilliVolts() instead of raw analogRead() counts.
+// The ESP32 ADC is known to be non-linear (especially near 0V and 3.3V), so
+// analogReadMilliVolts() (which applies the chip's factory eFuse calibration)
+// gives a noticeably more accurate voltage than raw*(3.3/4095.0) would.
+float getAverageMilliVolts(int analogPin, int samples = 20)
+{
+  long sum = 0;
 
+  for (int i = 0; i < samples; i++)
+  {
+    sum += analogReadMilliVolts(analogPin);
+    delay(10);
+  }
+
+  return sum / (float)samples;
+}
+
+// Convert voltage to pH (Calibration Required)
 float voltageTopH(float voltage)
 {
-    float m = -1.095;
-    float b = 9.7375;
+  float m = -1.095;
+  float b = 9.7375;
 
-    return (m * voltage + b);
+  return (m * voltage + b);
 }
 
-//====================================================
-// TDS Calculation
-//====================================================
-
-float calculateTDS(int adcValue, float temperature)
+// Convert the turbidity sensor's TRUE output voltage (after undoing the
+// divider) into NTU (Nephelometric Turbidity Units).
+// Calibration curve from DFRobot's analog turbidity sensor wiki, valid when
+// clear water reads ~4.1-4.2V at 5V supply:
+//   https://wiki.dfrobot.com/Turbidity_sensor_SKU__SEN0189
+// The curve is a downward parabola, only meaningful between ~2.5V-4.2V
+// (which covers the sensor's full 0-1000 NTU spec range and a bit beyond).
+// Outside that window the polynomial folds back on itself, so it's clamped.
+float voltageToNTU(float voltage)
 {
-    float voltage = adcValue * VREF / ADC_RESOLUTION;
+  if (voltage >= 4.2) {
+    return 0.0;     // at/above the clear-water reference voltage -> 0 NTU
+  }
+  if (voltage < 2.5) {
+    return 3000.0;  // below the curve's valid range -> very high/off-scale turbidity
+  }
 
-    float compensationCoefficient =
-        1.0 + 0.02 * (temperature - 25.0);
-
-    float compensationVoltage =
-        voltage / compensationCoefficient;
-
-    float tds =
-        (133.42 * compensationVoltage * compensationVoltage * compensationVoltage
-        -255.86 * compensationVoltage * compensationVoltage
-        +857.39 * compensationVoltage)
-        *0.5;
-
-    return tds;
+  float ntu = -1120.4 * voltage * voltage + 5742.3 * voltage - 4352.9;
+  return (ntu < 0) ? 0.0 : ntu;
 }
 
-//====================================================
+// Convert the TDS sensor's output voltage into TDS in ppm, with temperature
+// compensation. Calibration curve from DFRobot's Gravity Analog TDS Sensor
+// (SEN0244) wiki - this matches the datasheet you provided exactly
+// (3.3-5.5V in, 0-2.3V out, 0-1000ppm range, +-10% F.S. accuracy):
+//   https://wiki.dfrobot.com/sen0244/docs/20305
+float voltageToTDS(float voltage, float temperatureC = 25.0)
+{
+  float compensationCoefficient = 1.0 + 0.02 * (temperatureC - 25.0);
+  float compensationVoltage = voltage / compensationCoefficient;
+
+  float tds = (133.42 * compensationVoltage * compensationVoltage * compensationVoltage
+             - 255.86 * compensationVoltage * compensationVoltage
+             + 857.39 * compensationVoltage) * 0.5;
+
+  if (tds < 0) tds = 0;
+  if (tds > 1000) tds = 1000; // sensor's spec'd measurement ceiling
+  return tds;
+}
+
+// -------------------------
 // Setup
-//====================================================
+// -------------------------
+void setup() {
 
-void setup()
-{
-    Serial.begin(115200);
-    delay(2000);
+  Serial.begin(115200);
+  delay(3000);   // Give Serial Monitor time to connect
 
-    Serial.println();
-    Serial.println("=======================================");
-    Serial.println("      AquaSense ESP32 Starting");
-    Serial.println("=======================================");
+  // Explicit ADC config for reliable, repeatable readings
+  analogReadResolution(12);        // 0-4095
+  analogSetAttenuation(ADC_11db);  // full ~0-3.3V input range on all ADC1 pins
 
-    analogReadResolution(12);
-    analogSetAttenuation(ADC_11db);
+  Serial.println();
+  Serial.println("==============================");
+  Serial.println("ESP32 Booted");
+  Serial.println("==============================");
 
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect(true);
+  Serial.print("Connecting to: ");
+  Serial.println(ssid);
+
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect(true);
+  delay(1000);
+
+  WiFi.begin(ssid, password);
+
+  int attempts = 0;
+
+  while (WiFi.status() != WL_CONNECTED && attempts < 30)
+  {
+    Serial.print(".");
 
     delay(1000);
 
-    Serial.print("Connecting to WiFi : ");
-    Serial.println(ssid);
+    attempts++;
 
-    WiFi.begin(ssid, password);
+    Serial.print(" Status = ");
+    Serial.println(WiFi.status());
+  }
 
-    int attempts = 0;
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    Serial.println();
+    Serial.println("WiFi Connected!");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
 
-    while (WiFi.status() != WL_CONNECTED && attempts < 20)
-    {
-        Serial.print(".");
-        delay(1000);
-        attempts++;
-    }
-
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        Serial.println();
-        Serial.println("WiFi Connected!");
-
-        Serial.print("IP Address : ");
-        Serial.println(WiFi.localIP());
-
-        ThingSpeak.begin(client);
-    }
-    else
-    {
-        Serial.println();
-        Serial.println("WiFi Connection Failed!");
-    }
+    ThingSpeak.begin(client);
+  }
+  else
+  {
+    Serial.println();
+    Serial.println("WiFi FAILED!");
+  }
 }
 
+// -------------------------
+// Loop
+// -------------------------
 void loop()
 {
-    //=========================================
-    // WiFi Reconnect
-    //=========================================
+  // ---- pH (unchanged - already confirmed working) ----
+  int phRaw = getAverageReading(phSensorPin);
+  float phVoltage = phRaw * (3.3 / 4095.0);
+  float pH = voltageTopH(phVoltage);
 
-    if (WiFi.status() != WL_CONNECTED)
-    {
-        Serial.println("\nWiFi Lost... Reconnecting");
+  // ---- Turbidity ----
+  float turbidityMeasuredVoltage = getAverageMilliVolts(turbidityPin) / 1000.0; // volts at the ESP32 pin
+  float turbiditySensorVoltage = turbidityMeasuredVoltage / TURBIDITY_DIVIDER_RATIO; // recovered sensor output (0-4.5V)
+  float turbidityNTU = voltageToNTU(turbiditySensorVoltage);
 
-        WiFi.disconnect();
-        WiFi.begin(ssid, password);
+  // ---- TDS ----
+  float tdsVoltage = getAverageMilliVolts(tdsPin) / 1000.0; // 0-2.3V, fits directly in ESP32's 0-3.3V range
+  float tdsValue = voltageToTDS(tdsVoltage);
 
-        int retry = 0;
+  // Display
+  Serial.println("------------------------");
+  Serial.print("pH: ");
+  Serial.println(pH);
 
-        while (WiFi.status() != WL_CONNECTED && retry < 10)
-        {
-            delay(1000);
-            Serial.print(".");
-            retry++;
-        }
+  Serial.print("Turbidity sensor voltage: ");
+  Serial.print(turbiditySensorVoltage, 3);
+  Serial.println(" V");
+  Serial.print("Turbidity: ");
+  Serial.print(turbidityNTU, 1);
+  Serial.println(" NTU");
 
-        if (WiFi.status() == WL_CONNECTED)
-            Serial.println("\nReconnected!");
-        else
-            Serial.println("\nReconnect Failed");
-    }
+  Serial.print("TDS voltage: ");
+  Serial.print(tdsVoltage, 3);
+  Serial.println(" V");
+  Serial.print("TDS: ");
+  Serial.print(tdsValue, 1);
+  Serial.println(" ppm");
 
-    //=========================================
-    // pH
-    //=========================================
+  // Send to ThingSpeak
+  ThingSpeak.setField(1, pH);
+  ThingSpeak.setField(2, turbidityNTU);
+  ThingSpeak.setField(3, tdsValue);
 
-    int phRaw = getAverageReading(phSensorPin);
+  int response = ThingSpeak.writeFields(channelID, writeAPIKey);
 
-    float phVoltage =
-        phRaw * VREF / ADC_RESOLUTION;
+  if (response == 200)
+  {
+    Serial.println("ThingSpeak Update Successful");
+  }
+  else
+  {
+    Serial.print("ThingSpeak Error: ");
+    Serial.println(response);
+  }
 
-    float pH = voltageTopH(phVoltage);
-
-    //=========================================
-    // Turbidity
-    //=========================================
-
-    int turbidityRaw = getAverageReading(turbidityPin);
-
-    float turbidityPercent =
-        ((4095.0 - turbidityRaw) / 4095.0) * 100.0;
-
-    turbidityPercent =
-        constrain(turbidityPercent, 0.0, 100.0);
-
-    //=========================================
-    // TDS (Median Filter)
-    //=========================================
-
-    for (int i = 0; i < SCOUNT; i++)
-    {
-        analogBuffer[i] = analogRead(tdsPin);
-        delay(20);
-    }
-
-    for (int i = 0; i < SCOUNT; i++)
-    {
-        analogBufferTemp[i] = analogBuffer[i];
-    }
-
-    int tdsADC = getMedianNum(analogBufferTemp, SCOUNT);
-
-    float voltage = tdsADC * VREF / ADC_RESOLUTION;
-
-    float compensationCoefficient = 1.0 + 0.02 * (waterTemperature - 25.0);
-
-    float compensationVoltage = voltage / compensationCoefficient;
-
-    float tds = calculateTDS(tdsADC, waterTemperature);
-
-    //=========================================
-    // Serial Monitor
-    //=========================================
-
-    Serial.println();
-    Serial.println("=======================================");
-
-    Serial.print("pH               : ");
-    Serial.println(pH, 2);
-
-    Serial.print("pH Voltage       : ");
-    Serial.print(phVoltage, 3);
-    Serial.println(" V");
-
-    Serial.print("Turbidity        : ");
-    Serial.print(turbidityPercent, 1);
-    Serial.println(" %");
-
-    Serial.print("Water Temp       : ");
-    Serial.print(waterTemperature, 1);
-    Serial.println(" C");
-
-    Serial.print("TDS ADC          : ");
-    Serial.println(tdsADC);
-
-    Serial.print("TDS Voltage      : ");
-    Serial.print(voltage, 3);
-    Serial.println(" V");
-
-    Serial.print("Comp Voltage     : ");
-    Serial.print(compensationVoltage, 3);
-    Serial.println(" V");
-
-    Serial.print("TDS              : ");
-    Serial.print(tds, 1);
-    Serial.println(" ppm");
-
-    Serial.println("=======================================");
-
-    //=========================================
-    // ThingSpeak Upload
-    //=========================================
-
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        ThingSpeak.setField(1, pH);
-        ThingSpeak.setField(2, turbidityPercent);
-        ThingSpeak.setField(3, tds);
-
-        int response =
-            ThingSpeak.writeFields(channelID,
-                                   writeAPIKey);
-
-        if (response == 200)
-        {
-            Serial.println("ThingSpeak Upload Successful");
-        }
-        else
-        {
-            Serial.print("ThingSpeak Error : ");
-            Serial.println(response);
-        }
-    }
-    else
-    {
-        Serial.println("Upload Skipped (No WiFi)");
-    }
-
-    delay(15000);
+  // ThingSpeak free accounts require at least 15 seconds
+  delay(20000);
 }
-

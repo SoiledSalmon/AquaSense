@@ -651,9 +651,9 @@ export default function LiveDashboard({ user }: { user: User }) {
               <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
                 <Filter className="w-4 h-4" />
               </div>
-              <span className="text-sm font-semibold text-slate-400">Total Dissolved Solids</span>
+              <span className="text-sm font-semibold text-slate-400">Turbidity</span>
             </div>
-            <span className="text-xs text-slate-500">Safe: &lt; 300 ppm</span>
+            <span className="text-xs text-slate-500">Safe: &lt; 5 NTU</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
@@ -678,9 +678,9 @@ export default function LiveDashboard({ user }: { user: User }) {
               <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
                 <Droplets className="w-4 h-4" />
               </div>
-              <span className="text-sm font-semibold text-slate-400">Turbidity</span>
+              <span className="text-sm font-semibold text-slate-400">Total Dissolved Solids</span>
             </div>
-            <span className="text-xs text-slate-500">Safe: &lt; 5 NTU</span>
+            <span className="text-xs text-slate-500">Safe: &lt; 300 ppm</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1">
