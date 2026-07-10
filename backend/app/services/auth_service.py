@@ -1,7 +1,7 @@
 """Auth business logic — orchestrates Supabase Auth and user repository.
 
-This is the services layer: no FastAPI imports, no raw SQL
-(constitution Article I). Raises domain exceptions from core.exceptions.
+This is the services layer: no FastAPI imports, no raw SQL.
+Raises domain exceptions from core.exceptions.
 """
 
 import structlog
@@ -70,12 +70,16 @@ class AuthService:
         try:
             await self._users.create_user(user_data)
         except Exception as exc:
-            logger.error("signup_profile_creation_failed", user_id=user.id, error=str(exc))
+            logger.error(
+                "signup_profile_creation_failed", user_id=user.id, error=str(exc)
+            )
             try:
                 await self._admin.auth.admin.delete_user(user.id)
                 logger.info("signup_rollback_success", user_id=user.id)
             except Exception as rollback_exc:
-                logger.critical("signup_rollback_failed", user_id=user.id, error=str(rollback_exc))
+                logger.critical(
+                    "signup_rollback_failed", user_id=user.id, error=str(rollback_exc)
+                )
             raise exc
 
         session = auth_response.session
@@ -121,19 +125,17 @@ class AuthService:
         }
 
     async def logout(self, user_id: str) -> None:
-        """Revoke all sessions for this user server-side.
+        """Log out the user by clearing their session cookies.
 
-        Uses scope='global' to invalidate every session — per the
-        Supabase skill: "revoke sessions explicitly on account deletion."
+        Invokes sign_out on the Supabase admin client to revoke server-side sessions.
+        Uses try/except to degrade gracefully in production if the session or token is invalid.
         """
         try:
-            # Sign out all sessions via admin API
             await self._admin.auth.admin.sign_out(user_id, scope="global")
-        except Exception:
-            # If sign-out fails, log but don't block (cookies get cleared
-            # on the response anyway)
-            logger.warning("logout_revoke_failed", user_id=user_id)
-
+        except Exception as exc:
+            logger.warning(
+                "logout_server_revocation_failed", user_id=user_id, error=str(exc)
+            )
         logger.info("user_logged_out", user_id=user_id)
 
     async def get_profile(self, user_id: str) -> dict:
@@ -143,9 +145,7 @@ class AuthService:
             raise UserNotFoundError()
         return profile
 
-    async def update_profile(
-        self, user_id: str, updates: dict
-    ) -> dict:
+    async def update_profile(self, user_id: str, updates: dict) -> dict:
         """Update allowed profile fields.
 
         Only channel_id, ts_api_key, phone, and full_name are editable.

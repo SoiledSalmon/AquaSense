@@ -1,7 +1,6 @@
 """Readings repository — data access layer for the readings hypertable.
 
 Uses the Supabase client with parameterized queries/constructs.
-No business logic (constitution Article I).
 """
 
 from datetime import datetime
@@ -10,6 +9,8 @@ import structlog
 logger = structlog.get_logger()
 
 
+# TODO: [TECH-DEBT-001] Currently using plain Postgres 17 materialized views instead of TimescaleDB hypertables.
+# Deferred due to PG15/PG17 version mismatch risk; revisit before scaling beyond development/demo volume.
 class ReadingsRepository:
     """CRUD operations on the public.readings hypertable via Supabase client."""
 
@@ -24,11 +25,7 @@ class ReadingsRepository:
         if "id" in data and data["id"] is None:
             data.pop("id")
 
-        response = await (
-            self._client.table("readings")
-            .insert(data)
-            .execute()
-        )
+        response = await self._client.table("readings").insert(data).execute()
         if not response.data:
             logger.error("reading_insert_failed", user_id=reading_data.get("user_id"))
             raise Exception("Failed to insert reading")
@@ -46,7 +43,7 @@ class ReadingsRepository:
         )
         if not response.data:
             return None
-        
+
         timestamp_str = response.data[0]["timestamp"]
         return datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
 
@@ -92,7 +89,9 @@ class ReadingsRepository:
         data.reverse()
         return data
 
-    async def update_reading_ml(self, reading_id: str, wqi_score: float, label: str) -> dict:
+    async def update_reading_ml(
+        self, reading_id: str, wqi_score: float, label: str
+    ) -> dict:
         """Update a reading row with computed WQI score and classification label."""
         response = await (
             self._client.table("readings")
@@ -110,13 +109,11 @@ class ReadingsRepository:
         data = {**result_data}
         if isinstance(data.get("timestamp"), datetime):
             data["timestamp"] = data["timestamp"].isoformat()
-        response = await (
-            self._client.table("ml_results")
-            .insert(data)
-            .execute()
-        )
+        response = await self._client.table("ml_results").insert(data).execute()
         if not response.data:
-            logger.error("ml_result_insert_failed", reading_id=result_data.get("reading_id"))
+            logger.error(
+                "ml_result_insert_failed", reading_id=result_data.get("reading_id")
+            )
             raise Exception("Failed to insert ML result")
         return response.data[0]
 
@@ -125,11 +122,7 @@ class ReadingsRepository:
         data = {**alert_data}
         if isinstance(data.get("timestamp"), datetime):
             data["timestamp"] = data["timestamp"].isoformat()
-        response = await (
-            self._client.table("alerts")
-            .insert(data)
-            .execute()
-        )
+        response = await self._client.table("alerts").insert(data).execute()
         if not response.data:
             logger.error("create_alert_failed", user_id=alert_data.get("user_id"))
             raise Exception("Failed to create alert")

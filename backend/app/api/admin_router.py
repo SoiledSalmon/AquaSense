@@ -4,7 +4,7 @@ FastAPI endpoints exposing administrator functionalities: statistics, user manag
 global readings, alerts history, and ML prediction monitoring.
 """
 
-from typing import Annotated, Optional
+from typing import Optional
 import structlog
 
 from fastapi import APIRouter, Depends, Query, Request, status
@@ -45,6 +45,7 @@ def _get_admin_service(
 
 # ── GET /api/admin/stats ──────────────────────────────
 
+
 @router.get(
     "/stats",
     response_model=AdminStatsResponse,
@@ -63,6 +64,7 @@ async def get_stats(
 
 
 # ── GET /api/admin/users ──────────────────────────────
+
 
 @router.get(
     "/users",
@@ -95,6 +97,7 @@ async def get_users(
 
 # ── GET /api/admin/users/{user_id} ────────────────────
 
+
 @router.get(
     "/users/{user_id}",
     response_model=AdminUserResponse,
@@ -114,6 +117,7 @@ async def get_user(
 
 # ── PATCH /api/admin/users/{user_id}/role ─────────────
 
+
 @router.patch(
     "/users/{user_id}/role",
     response_model=AdminUserResponse,
@@ -128,11 +132,17 @@ async def update_user_role(
     try:
         return await service.update_user_role(user_id, body.role)
     except Exception as e:
-        logger.error("admin_api_update_role_failed", user_id=user_id, role=body.role, error=str(e))
+        logger.error(
+            "admin_api_update_role_failed",
+            user_id=user_id,
+            role=body.role,
+            error=str(e),
+        )
         raise
 
 
 # ── DELETE /api/admin/users/{user_id} ─────────────────
+
 
 @router.delete(
     "/users/{user_id}",
@@ -152,6 +162,7 @@ async def delete_user(
 
 
 # ── GET /api/admin/readings ───────────────────────────
+
 
 @router.get(
     "/readings",
@@ -179,6 +190,7 @@ async def get_readings(
 
 
 # ── GET /api/admin/alerts ─────────────────────────────
+
 
 @router.get(
     "/alerts",
@@ -210,6 +222,7 @@ async def get_alerts(
 
 
 # ── GET /api/admin/ml ─────────────────────────────────
+
 
 @router.get(
     "/ml",

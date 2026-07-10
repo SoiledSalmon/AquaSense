@@ -52,6 +52,7 @@ async def get_current_user(
             REFRESH_TOKEN_MAX_AGE,
             create_cookie_params,
         )
+
         cookie_params = create_cookie_params(settings)
         response.set_cookie(
             key="access_token",
@@ -69,7 +70,9 @@ async def get_current_user(
         return {
             "sub": user.id,
             "email": user.email,
-            "role": user.app_metadata.get("role", "user") if user.app_metadata else "user",
+            "role": user.app_metadata.get("role", "user")
+            if user.app_metadata
+            else "user",
             "app_metadata": user.app_metadata or {},
             "user_metadata": user.user_metadata or {},
         }
@@ -95,7 +98,7 @@ def get_supabase_admin(request: Request):
 
 
 async def get_current_admin(
-    current_user: Annotated[dict, Depends(get_current_user)]
+    current_user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
     """Verify that the current user has the admin role.
 
@@ -106,12 +109,14 @@ async def get_current_admin(
     role = current_user.get("role")
     if not role or role == "authenticated":
         app_metadata = current_user.get("app_metadata", {})
-        role = app_metadata.get("role", "user") if isinstance(app_metadata, dict) else "user"
+        role = (
+            app_metadata.get("role", "user")
+            if isinstance(app_metadata, dict)
+            else "user"
+        )
 
     if role != "admin":
         raise HTTPException(
-            status_code=403,
-            detail="Forbidden: Administrator access required"
+            status_code=403, detail="Forbidden: Administrator access required"
         )
     return current_user
-

@@ -1,8 +1,7 @@
-"""Auth router — PRD §7.2 endpoints.
+"""Auth router endpoints.
 
 Handles request parsing, cookie management, rate limiting, and
-status codes. Delegates all business logic to AuthService
-(constitution Article I: API layer may NOT contain business logic).
+status codes. Delegates all business logic to AuthService.
 """
 
 from typing import Annotated
@@ -73,6 +72,7 @@ def _clear_auth_cookies(response: Response, settings: Settings) -> None:
 
 # ── POST /api/auth/signup ─────────────────────────────
 
+
 @router.post(
     "/signup",
     response_model=AuthResponse,
@@ -104,6 +104,7 @@ async def signup(
 
 # ── POST /api/auth/login ─────────────────────────────
 
+
 @router.post(
     "/login",
     response_model=AuthResponse,
@@ -130,6 +131,7 @@ async def login(
 
 # ── POST /api/auth/logout ────────────────────────────
 
+
 @router.post(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -148,6 +150,7 @@ async def logout(
 
 # ── GET /api/auth/me ──────────────────────────────────
 
+
 @router.get(
     "/me",
     response_model=UserResponse,
@@ -163,6 +166,7 @@ async def get_me(
 
 
 # ── PATCH /api/auth/profile ───────────────────────────
+
 
 @router.patch(
     "/profile",

@@ -3,7 +3,7 @@
 Domain exceptions live in the services/repositories layers.
 The API layer catches them via registered handlers and returns
 the correct HTTP status code — keeping business logic free of
-FastAPI imports (constitution Article I).
+FastAPI imports.
 """
 
 from fastapi import FastAPI, Request
@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 
 # ── Domain Exceptions ─────────────────────────────────
+
 
 class InvalidCredentialsError(Exception):
     """Raised when login credentials are wrong or a JWT is invalid."""
@@ -54,6 +55,7 @@ class ProfileCreationError(Exception):
 
 
 # ── Handler Registration ─────────────────────────────
+
 
 def register_exception_handlers(app: FastAPI) -> None:
     """Attach domain-exception → HTTP-response mappings to the app."""
@@ -102,4 +104,3 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=500,
             content={"error": "internal_error", "message": exc.detail},
         )
-

@@ -1,10 +1,10 @@
 """Admin service — coordinates business logic for Phase 6 admin features.
 
 Handles role synchronization, user deletion via Supabase admin client,
-and system status checks (constitution Article I: Services layer).
+and system status checks.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 import structlog
 from fastapi import Request
 
@@ -75,8 +75,15 @@ class AdminService:
                 {"app_metadata": {"role": new_role}},
             )
         except Exception as exc:
-            logger.error("admin_service_auth_role_update_failed", user_id=user_id, role=new_role, error=str(exc))
-            raise ProfileUpdateError("Failed to update user role in auth database") from exc
+            logger.error(
+                "admin_service_auth_role_update_failed",
+                user_id=user_id,
+                role=new_role,
+                error=str(exc),
+            )
+            raise ProfileUpdateError(
+                "Failed to update user role in auth database"
+            ) from exc
 
         # 3. Update public.users table role
         updated_profile = await self._repo.update_user_role(user_id, new_role)
@@ -99,14 +106,20 @@ class AdminService:
             await self._admin.auth.admin.sign_out(user_id, scope="global")
         except Exception as exc:
             # Log failure to sign out but proceed with deletion
-            logger.warning("admin_service_sign_out_before_delete_failed", user_id=user_id, error=str(exc))
+            logger.warning(
+                "admin_service_sign_out_before_delete_failed",
+                user_id=user_id,
+                error=str(exc),
+            )
 
         try:
             # Delete user via admin client
             await self._admin.auth.admin.delete_user(user_id)
             logger.info("user_permanently_deleted", user_id=user_id)
         except Exception as exc:
-            logger.error("admin_service_delete_user_failed", user_id=user_id, error=str(exc))
+            logger.error(
+                "admin_service_delete_user_failed", user_id=user_id, error=str(exc)
+            )
             raise ProfileUpdateError("Failed to delete user account") from exc
 
     async def get_readings_history(
@@ -241,7 +254,11 @@ class AdminService:
             db_status = "unhealthy"
 
         mqtt_status = "unknown"
-        if request.app and hasattr(request.app, "state") and hasattr(request.app.state, "mqtt_status"):
+        if (
+            request.app
+            and hasattr(request.app, "state")
+            and hasattr(request.app.state, "mqtt_status")
+        ):
             mqtt_status = request.app.state.mqtt_status
 
         return {

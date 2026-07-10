@@ -4,14 +4,13 @@ Logs to stdout with JSON format in production and console format in development.
 """
 
 import logging
-import os
-import sys
 import structlog
 from app.core.config import get_settings
 
+
 def setup_logging():
     """Configures application-wide logging with structlog.
-    
+
     Checks environment configurations and applies JSON formatting for production/staging,
     and pretty console logging for development.
     """
@@ -28,12 +27,10 @@ def setup_logging():
     if is_production:
         processors = shared_processors + [
             structlog.processors.dict_tracebacks,
-            structlog.processors.JSONRenderer()
+            structlog.processors.JSONRenderer(),
         ]
     else:
-        processors = shared_processors + [
-            structlog.dev.ConsoleRenderer(colors=True)
-        ]
+        processors = shared_processors + [structlog.dev.ConsoleRenderer(colors=True)]
 
     structlog.configure(
         processors=processors,

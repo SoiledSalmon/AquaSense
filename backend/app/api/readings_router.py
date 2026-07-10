@@ -4,7 +4,7 @@ FastAPI endpoints for streaming live telemetry, retrieving the latest telemetry 
 and fetching historical aggregated sensor readings from continuous aggregates.
 """
 
-from typing import Annotated, Optional
+from typing import Annotated
 import json
 import asyncio
 from datetime import datetime
@@ -23,10 +23,10 @@ router = APIRouter(prefix="/api", tags=["readings"])
 
 
 def _get_readings_repo(
-    supabase_admin=Depends(get_supabase_admin)
+    supabase_admin=Depends(get_supabase_admin),
 ) -> ReadingsRepository:
     """Dependency injector to obtain the ReadingsRepository with an admin client.
-    
+
     Using the admin client allows querying the materialized views bypassing RLS issues.
     Strict user filtering is applied directly at the database queries.
     """
@@ -47,7 +47,7 @@ async def get_latest_reading(
         logger.error("api_get_latest_reading_failed", user_id=user_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch latest reading"
+            detail="Failed to fetch latest reading",
         )
 
 
@@ -72,16 +72,21 @@ async def get_readings_history(
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid range parameter. Supported: 24h, 7d, 30d"
+                detail="Invalid range parameter. Supported: 24h, 7d, 30d",
             )
         return {"range": range, "data": data}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("api_get_readings_history_failed", user_id=user_id, range=range, error=str(e))
+        logger.error(
+            "api_get_readings_history_failed",
+            user_id=user_id,
+            range=range,
+            error=str(e),
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to fetch readings history"
+            detail="Failed to fetch readings history",
         )
 
 
@@ -106,7 +111,9 @@ async def stream_telemetry(
                         latest_reading[k] = v.isoformat()
                 yield f"event: reading_update\ndata: {json.dumps(latest_reading)}\n\n"
         except Exception as e:
-            logger.error("sse_send_initial_reading_failed", user_id=user_id, error=str(e))
+            logger.error(
+                "sse_send_initial_reading_failed", user_id=user_id, error=str(e)
+            )
 
         try:
             # Query unread alerts (fail-safe fallback if table is missing)
@@ -121,7 +128,9 @@ async def stream_telemetry(
             for alert in unread_alerts:
                 yield f"event: alert_new\ndata: {json.dumps(alert)}\n\n"
         except Exception as e:
-            logger.warning("sse_send_initial_alerts_warning", user_id=user_id, error=str(e))
+            logger.warning(
+                "sse_send_initial_alerts_warning", user_id=user_id, error=str(e)
+            )
 
         # 2. Main subscriber loop
         try:
@@ -159,5 +168,5 @@ async def stream_telemetry(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
-        }
+        },
     )

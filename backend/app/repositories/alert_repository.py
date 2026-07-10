@@ -26,17 +26,15 @@ class AlertRepository:
         if isinstance(data.get("resolved_at"), datetime):
             data["resolved_at"] = data["resolved_at"].isoformat()
 
-        response = await (
-            self._client.table("alerts")
-            .insert(data)
-            .execute()
-        )
+        response = await self._client.table("alerts").insert(data).execute()
         if not response.data:
             logger.error("alert_insert_failed", user_id=alert_data.get("user_id"))
             raise Exception("Failed to insert alert")
         return response.data[0]
 
-    async def get_alerts(self, user_id: str, status: str = "all", limit: int = 50) -> List[Dict[str, Any]]:
+    async def get_alerts(
+        self, user_id: str, status: str = "all", limit: int = 50
+    ) -> List[Dict[str, Any]]:
         """Retrieve alerts for the user, filtered by status."""
         query = self._client.table("alerts").select("*").eq("user_id", user_id)
 
@@ -67,7 +65,9 @@ class AlertRepository:
             return None
         return response.data[0]
 
-    async def update_alert(self, alert_id: str, user_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_alert(
+        self, alert_id: str, user_id: str, updates: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Update an alert's columns, verifying user ownership."""
         formatted_updates = {}
         for k, v in updates.items():
@@ -88,7 +88,9 @@ class AlertRepository:
             raise Exception("Failed to update alert or alert not found")
         return response.data[0]
 
-    async def get_latest_alert_by_category(self, user_id: str, category: str) -> Optional[Dict[str, Any]]:
+    async def get_latest_alert_by_category(
+        self, user_id: str, category: str
+    ) -> Optional[Dict[str, Any]]:
         """Get the most recent alert of a specific category for a user (used for cooldown checks)."""
         response = await (
             self._client.table("alerts")

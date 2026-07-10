@@ -13,8 +13,8 @@ from app.core.exceptions import InvalidCredentialsError
 
 # ── Constants ─────────────────────────────────────────
 ALGORITHM = "HS256"
-ACCESS_TOKEN_MAX_AGE = 900          # 15 minutes in seconds
-REFRESH_TOKEN_MAX_AGE = 604_800     # 7 days in seconds
+ACCESS_TOKEN_MAX_AGE = 900  # 15 minutes in seconds
+REFRESH_TOKEN_MAX_AGE = 604_800  # 7 days in seconds
 
 
 def verify_jwt(token: str, settings: Settings) -> dict:
@@ -31,7 +31,7 @@ def verify_jwt(token: str, settings: Settings) -> dict:
             algorithms=[ALGORITHM],
             options={
                 "verify_exp": True,
-                "verify_aud": False,   # Supabase audience varies
+                "verify_aud": False,  # Supabase audience varies
             },
         )
     except JWTError:

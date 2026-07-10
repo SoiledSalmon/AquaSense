@@ -1,7 +1,7 @@
 """Pydantic V2 request/response models for auth endpoints.
 
 Every endpoint validates its input via a Pydantic model — no raw dict
-request bodies (constitution Article III §3).
+request bodies.
 """
 
 from datetime import datetime
@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 # ── Request Models ────────────────────────────────────
+
 
 class SignupRequest(BaseModel):
     """POST /api/auth/signup body."""
@@ -54,6 +55,7 @@ class ProfileUpdateRequest(BaseModel):
 
 
 # ── Response Models ───────────────────────────────────
+
 
 class UserResponse(BaseModel):
     """Standard user representation returned by auth endpoints."""

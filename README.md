@@ -1,89 +1,106 @@
 # AquaSense — IoT Water Quality Monitoring & ML Diagnostics
 
-AquaSense is an end-to-end IoT platform for real-time water quality tracking, statistical anomaly detection, and predictive safety analysis. It integrates ESP32 microcontrollers, ThingSpeak MQTT brokers, a FastAPI backend orchestrating a 3-layer machine learning pipeline, and a Next.js 15 dashboard streaming live metrics over Server-Sent Events (SSE).
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+AquaSense is an open-source, end-to-end IoT platform for real-time water quality tracking, statistical anomaly detection, and predictive safety analysis. It integrates ESP32 microcontrollers, ThingSpeak MQTT brokers, a FastAPI backend orchestrating a 3-layer machine learning pipeline, and a Next.js dashboard streaming live metrics over Server-Sent Events (SSE).
 
 ---
 
-## 🚀 Key Features
+## 🏗 System Architecture
 
-*   **Real-Time Data Streaming:** High-frequency ingestion of pH, Total Dissolved Solids (TDS), and Turbidity pushed instantly to frontend clients over Server-Sent Events (SSE).
-*   **Predictive Diagnostics:** XGBoost classifier evaluates telemetry in real time, predicting safety status (`Safe`, `Borderline`, `Unsafe`) and generating mathematically exact SHAP contribution metrics.
-*   **Statistical Anomalies:** Isolation Forest outlier detection on EWMA-smoothed parameters identifies sensor drift, device errors, or filtration failures.
-*   **Contaminant Alert Engine:** Evaluates metrics against dynamic rules, issuing warning notifications and user-specific actionable safety recommendations.
-*   **Unified Auth & Role Control:** Secure Supabase Auth proxied through FastAPI with HttpOnly session cookies. Role-Based Access Control (RBAC) allows administrators to manage users and system metrics.
+AquaSense uses a decoulped architecture that bridges hardware telemetry, machine learning intelligence, and a real-time reactive UI.
+
+```mermaid
+graph TD
+    %% Perception Layer (ESP32)
+    subgraph Hardware [Perception Layer]
+        ESP32[ESP32 Microcontroller] -->|pH Sensor| PH[Analog pH Meter]
+        ESP32 -->|TDS Sensor| TDS[Analog TDS Sensor]
+        ESP32 -->|Turbidity Sensor| TURB[Analog Turbidity Sensor]
+    end
+
+    %% Ingestion & Ingress
+    subgraph Connectivity [Connectivity & Ingestion]
+        ESP32 -->|HTTP POST| TS[ThingSpeak Channel]
+        TS -->|MQTT Broker| Sub[FastAPI MQTT Subscriber]
+    end
+
+    %% Application Backend
+    subgraph Backend [FastAPI Application Service]
+        Sub -->|Ingest & Validate| Pipeline[ML Pipeline Services]
+        
+        subgraph ML [Machine Learning Analysis]
+            Pipeline -->|Compute WQI| WQI[Water Quality Index]
+            Pipeline -->|EWMA Smoothing| Smooth[EWMA Filter]
+            Smooth -->|Classification| XGB[XGBoost Classifier]
+            XGB -->|Explanations| SHAP[Custom Tree SHAP Explainer]
+            Smooth -->|Anomaly Detection| IF[Isolation Forest]
+        end
+
+        Pipeline -->|Database Client| Repos[Repositories]
+        Pipeline -->|Trigger Alert| Alert[Contaminant Alert Engine]
+        Pipeline -->|Broadcast SSE| SSE[SSE Manager]
+    end
+
+    %% Persistence
+    subgraph Persistence [Storage Store]
+        Repos -->|Query / Insert| DB[(Supabase PostgreSQL)]
+        DB -->|Materialized Views| Agg[Hourly / Daily aggregates]
+    end
+
+    %% Web UI Client
+    subgraph Frontend [Next.js Dashboard]
+        UI[React Components] -->|API Client| Lib[Client APIs]
+        Lib -->|HTTPS REST| Backend
+        SSE -->|Server-Sent Events| Lib
+    end
+
+    classDef default fill:#0f172a,stroke:#1e293b,color:#cbd5e1;
+    classDef highlight fill:#1e3a8a,stroke:#3b82f6,color:#eff6ff;
+    class ESP32,Sub,XGB,IF,DB,UI highlight;
+```
 
 ---
 
 ## 🛠 Tech Stack
 
-*   **Backend:** FastAPI, `aiomqtt` (MQTT Client), `structlog` (Structured Logging), `slowapi` (Rate Limiting), Pydantic v2 (Validation), `jose` (JWT parsing).
-*   **Machine Learning:** XGBoost, Scikit-learn (Isolation Forest), Pandas, NumPy, Joblib, Custom Pure-Python Exact SHAP Explainer.
-*   **Frontend:** Next.js 16/15 (App Router), Tailwind CSS v4, Lucide Icons, Recharts (Telemetry Analytics).
-*   **Database:** Supabase PostgreSQL 17 (Materialized Views, pg_cron).
-*   **IoT Firmware:** Arduino/C++ for ESP32, WiFi client, ThingSpeak HTTP Post.
+*   **Firmware:** C++/Arduino for ESP32 with `WiFi.h` and `ThingSpeak.h` integration.
+*   **Backend:** FastAPI, `aiomqtt` (WebSocket MQTT client for ThingSpeak), `pydantic-settings` (v2), and `structlog` (structured logging).
+*   **Machine Learning:** XGBoost (v3.0), Scikit-learn (Isolation Forest), Pandas, NumPy, and Joblib.
+*   **Frontend:** Next.js (App Router), Tailwind CSS (v4), React (v19), Recharts.
+*   **Database:** Supabase PostgreSQL with time-series aggregates (Hourly/Daily materialized views).
 
 ---
 
-## 📂 Project Structure
+## 🔌 Hardware Requirements
 
-```
-AquaSense/
-├── .agents/                    # Workspace configuration & engineering workflows
-├── Firmware/
-│   └── AquaSense/
-│       └── AquaSense.ino      # ESP32 C++ firmware (Wi-Fi, sensor sampling, ThingSpeak client)
-├── backend/
-│   ├── app/
-│   │   ├── api/               # FastAPI routers & request/response validation schemas
-│   │   ├── core/              # Config, exceptions, dependencies, logging, auth helpers
-│   │   ├── ml/                # XGBoost + SHAP + Isolation Forest pipeline
-│   │   ├── repositories/      # Supabase/PostgreSQL parameterized database access queries
-│   │   ├── services/          # WQI scoring, alerts engine, SSE queues, ML orchestrator
-│   │   └── main.py            # FastAPI entry point & lifespan manager
-│   ├── migrations/            # Consolidated SQL schemas
-│   │   ├── relational/        # Users, alerts, and Relational tables
-│   │   └── timescaledb/       # Plain PostgreSQL time-series schema & materialized views
-│   ├── tests/                 # Full unit & integration pytest suite
-│   ├── requirements.txt       # Python dependencies
-│   └── .env.example           # Backend environment template
-├── frontend/
-│   ├── app/                   # Next.js Routes, Layouts, and Page compositions
-│   ├── components/            # Auth forms, live telemetry, and admin dashboards
-│   ├── lib/                   # Supabase client context & API proxy wrappers
-│   ├── package.json           # Node dependencies
-│   └── .env.example           # Frontend environment template
-├── docs/
-│   ├── adr/                   # Architecture Decision Records (001-005)
-│   ├── diagrams/              # Mermaid Architecture & Ingestion Flow diagrams
-│   ├── api.md                 # Detailed API Endpoint Reference
-│   └── deployment_guide.md    # Production deployment and operations playbook
-└── README.md                  # Handover developer guide
-```
+To build the perception layer, you need the following hardware components:
+1.  **ESP32 Microcontroller** (NodeMCU-32S or similar NodeMCU dev module).
+2.  **Analog pH Sensor** (with calibration board, e.g., DFRobot SEN0161).
+3.  **Analog TDS Sensor** (e.g., DFRobot SEN0244).
+4.  **Analog Turbidity Sensor** (e.g., DFRobot SEN0189).
+5.  **Voltage Divider Resistors** for Turbidity Sensor (10kΩ and 20kΩ) to scale the 5V sensor output to the safe 3.3V ESP32 ADC range.
 
 ---
 
-## ⚙️ Local Development Setup
+## ⚙️ Setup Instructions
 
-### 📋 Prerequisites
-*   Python `3.12` to `3.14`
-*   Node.js `18.x` or `20.x`
-*   C++ Compiler / Arduino IDE (for ESP32 hardware compilation only)
+### 1. Firmware Flash Setup
+1.  Open `firmware/AquaSense/AquaSense.ino` in the Arduino IDE.
+2.  Install required libraries via the Library Manager:
+    *   `ThingSpeak` by MathWorks.
+3.  Ensure your ESP32 board support packages are installed.
+4.  Update the configuration section in `AquaSense.ino` with your local Wi-Fi SSID, Password, and your ThingSpeak channel write API key:
+    ```cpp
+    const char* ssid = "YOUR_WIFI_SSID";
+    const char* password = "YOUR_WIFI_PASSWORD";
+    unsigned long channelID = YOUR_THINGSPEAK_CHANNEL_ID;
+    const char * writeAPIKey = "YOUR_THINGSPEAK_WRITE_API_KEY";
+    ```
+5.  Connect your ESP32 via USB, select your board and COM port, and click **Upload**.
 
----
-
-### 1. Database & Authentication Setup
-AquaSense relies on Supabase (Postgres 17) and plain PostgreSQL time-series indexes/views.
-
-1.  Create a project on the [Supabase Dashboard](https://supabase.com). The default **PostgreSQL 17** engine is recommended.
-2.  Open the Supabase SQL Editor and execute the SQL migrations in order:
-    *   **Relational Schema:** Run the scripts in [backend/migrations/relational/](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/relational/) sequentially.
-    *   **Time-Series Schema:** Run the scripts in [backend/migrations/timescaledb/](file:///D:/Coding%20Projects/College%20Era/AquaSense/backend/migrations/timescaledb/) sequentially.
-3.  Note down the project **URL**, **Anon API key**, **Service Role API key**, and **JWT Secret**.
-
----
-
-### 2. Backend Local Run
-1.  Navigate to the backend folder:
+### 2. Backend Setup
+1.  Navigate to the backend directory:
     ```bash
     cd backend
     ```
@@ -99,23 +116,25 @@ AquaSense relies on Supabase (Postgres 17) and plain PostgreSQL time-series inde
     ```bash
     pip install -r requirements.txt
     ```
-4.  Configure the environment variables:
-    *   Copy `.env.example` to `.env`
-    *   Fill in credentials captured during the Supabase setup.
-5.  Start the FastAPI development server:
+4.  Set up your environment parameters:
+    ```bash
+    cp .env.example .env
+    ```
+    Open `.env` and fill in your Supabase database configurations and ThingSpeak credentials.
+5.  Run database migrations sequentially in your Supabase SQL editor:
+    *   Relational schemas in `backend/migrations/relational/`
+    *   Time-series aggregates in `backend/migrations/timescaledb/`
+6.  Start the local development server:
     ```bash
     uvicorn app.main:app --reload
     ```
-    *The background MQTT subscriber will start automatically at startup. If the ThingSpeak broker is unreachable, it will trigger exponential backoff reconnect loops.*
-6.  Run the pytest test suite:
+7.  Verify tests pass:
     ```bash
     pytest
     ```
 
----
-
-### 3. Frontend Local Run
-1.  Navigate to the frontend folder:
+### 3. Frontend Setup
+1.  Navigate to the frontend directory:
     ```bash
     cd frontend
     ```
@@ -123,29 +142,42 @@ AquaSense relies on Supabase (Postgres 17) and plain PostgreSQL time-series inde
     ```bash
     npm install
     ```
-3.  Configure the environment variables:
-    *   Copy `.env.example` to `.env.local`
-    *   Ensure `NEXT_PUBLIC_API_URL` points to the local backend (usually `http://localhost:8000`).
-4.  Launch the Next.js development server:
+3.  Set up environment parameters:
+    ```bash
+    cp .env.example .env.local
+    ```
+    Configure the parameters (e.g., pointing `NEXT_PUBLIC_API_URL` to your local backend).
+4.  Run the development server:
     ```bash
     npm run dev
     ```
-5.  Access the client dashboard at `http://localhost:3000`.
+5.  Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-### 4. IoT Firmware Setup
-1.  Install the **Arduino IDE** and configure the esp32 board manager.
-2.  Open [Firmware/AquaSense/AquaSense.ino](file:///D:/Coding%20Projects/College%20Era/AquaSense/Firmware/AquaSense/AquaSense.ino).
-3.  Update the Wi-Fi credentials (`ssid`, `password`) and the ThingSpeak Channel ID & Write API Key.
-4.  Wire your analog pH, TDS, and Turbidity probes to the ESP32 GPIO pins matching the code configuration.
-5.  Compile and upload the firmware.
+## 🔑 Environment Variables
+
+### Backend (`backend/.env`)
+*   `SUPABASE_URL`: Your Supabase project URL.
+*   `SUPABASE_KEY`: Your Supabase anonymous/public key.
+*   `SUPABASE_SERVICE_ROLE_KEY`: Supabase server-only administration key (bypasses RLS).
+*   `SUPABASE_JWT_SECRET`: Secret token used to verify authentication JWT signatures.
+*   `THINGSPEAK_MQTT_USER`: ThingSpeak MQTT broker username.
+*   `THINGSPEAK_MQTT_API_KEY`: ThingSpeak MQTT broker API key.
+*   `THINGSPEAK_MQTT_CLIENT_ID`: ThingSpeak MQTT client ID (falls back to username if empty).
+*   `THINGSPEAK_REST_API_KEY`: Optional fallback ThingSpeak REST API read key for catch-up syncing.
+*   `FRONTEND_URL`: URL of the web dashboard (e.g., `http://localhost:3000`).
+*   `ENVIRONMENT`: `development`, `staging`, or `production`.
+
+### Frontend (`frontend/.env.local`)
+*   `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
+*   `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase anonymous/public key.
+*   `NEXT_PUBLIC_API_URL`: Root endpoint of the backend API (e.g., `http://localhost:8000`).
 
 ---
 
-## 📘 Documentation & Reference Links
+## 📄 License & Attribution
 
-*   **Architecture & Flowcharts:** Refer to [docs/diagrams/architecture.md](file:///D:/Coding%20Projects/College%20Era/AquaSense/docs/diagrams/architecture.md) for sequence/layered Mermaid diagrams.
-*   **API reference:** Endpoints, request/response models, query validation parameters are documented in [docs/api.md](file:///D:/Coding%20Projects/College%20Era/AquaSense/docs/api.md).
-*   **Production Deployment:** Step-by-step instructions for deploying to Vercel, Railway, and Supabase are detailed in [docs/deployment_guide.md](file:///D:/Coding%20Projects/College%20Era/AquaSense/docs/deployment_guide.md).
-*   **Technical Decisions:** Key engineering choices are documented in [docs/adr/](file:///D:/Coding%20Projects/College%20Era/AquaSense/docs/adr/).
+This project is licensed under the MIT License - see the [LICENSE](file:///LICENSE) file for details.
+
+Developed and maintained by the **Project Maintainers**.

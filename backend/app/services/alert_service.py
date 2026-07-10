@@ -39,14 +39,16 @@ class AlertService:
         self.engine = AlertRuleEngine()
         self.publisher = publisher or AlertPublisher()
 
-    async def process_alerts(self, reading: Dict[str, Any], supabase_client, cooldown_seconds: int = 900) -> List[Dict[str, Any]]:
+    async def process_alerts(
+        self, reading: Dict[str, Any], supabase_client, cooldown_seconds: int = 900
+    ) -> List[Dict[str, Any]]:
         """Evaluate reading telemetry, save new alerts to DB, and publish them via SSE.
-        
+
         Args:
             reading: The telemetry reading dict (including raw values and ML pipeline outputs).
             supabase_client: Supabase client instance.
             cooldown_seconds: Minimum time (in seconds) between alerts of the same category (default 15 minutes).
-            
+
         Returns:
             List of successfully persisted and published alert dictionaries.
         """
@@ -67,14 +69,18 @@ class AlertService:
                     latest_ts_str = latest.get("timestamp")
                     if latest_ts_str:
                         # Convert ISO format to datetime
-                        latest_ts = datetime.fromisoformat(latest_ts_str.replace("Z", "+00:00"))
-                        
+                        latest_ts = datetime.fromisoformat(
+                            latest_ts_str.replace("Z", "+00:00")
+                        )
+
                         reading_ts_str = reading.get("timestamp")
                         if reading_ts_str:
-                            reading_ts = datetime.fromisoformat(reading_ts_str.replace("Z", "+00:00"))
+                            reading_ts = datetime.fromisoformat(
+                                reading_ts_str.replace("Z", "+00:00")
+                            )
                         else:
                             reading_ts = datetime.now(timezone.utc)
-                            
+
                         # If difference is less than cooldown, suppress alert
                         diff = (reading_ts - latest_ts).total_seconds()
                         if diff < cooldown_seconds:
@@ -83,7 +89,7 @@ class AlertService:
                                 user_id=user_id,
                                 category=category,
                                 time_since_last=diff,
-                                cooldown=cooldown_seconds
+                                cooldown=cooldown_seconds,
                             )
                             continue
             except Exception as e:
@@ -94,12 +100,21 @@ class AlertService:
             try:
                 alert_record = await repo.create_alert(candidate)
                 generated_alerts.append(alert_record)
-                
+
                 # Publish in real-time over SSE
                 await self.publisher.publish(user_id, alert_record)
-                logger.info("alert_generated_and_published", alert_id=alert_record.get("id"), category=category)
+                logger.info(
+                    "alert_generated_and_published",
+                    alert_id=alert_record.get("id"),
+                    category=category,
+                )
             except Exception as e:
-                logger.error("alert_creation_or_publish_failed", user_id=user_id, category=category, error=str(e))
+                logger.error(
+                    "alert_creation_or_publish_failed",
+                    user_id=user_id,
+                    category=category,
+                    error=str(e),
+                )
 
         return generated_alerts
 

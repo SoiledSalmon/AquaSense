@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "AquaSense — Water Quality Monitoring",
-  description: "Real-time IoT water quality analytics dashboard and machine learning warning system.",
+  description:
+    "Real-time IoT water quality analytics dashboard and machine learning warning system.",
 };
 
 export default function RootLayout({

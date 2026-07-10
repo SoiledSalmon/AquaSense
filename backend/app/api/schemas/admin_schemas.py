@@ -1,22 +1,26 @@
 """Pydantic V2 models for Administrator Dashboard API request/response.
 
-Enforces strict input validation and clean API contracts (constitution Article III §3).
+Enforces strict input validation and clean API contracts.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 # ── Request Models ────────────────────────────────────
 
+
 class UserUpdateRoleRequest(BaseModel):
     """PATCH /api/admin/users/{user_id}/role body."""
 
-    role: str = Field(..., pattern="^(user|admin)$", description="Role must be 'user' or 'admin'")
+    role: str = Field(
+        ..., pattern="^(user|admin)$", description="Role must be 'user' or 'admin'"
+    )
 
 
 # ── Response Models ───────────────────────────────────
+
 
 class AdminUserResponse(BaseModel):
     """User profile representation for administrators."""

@@ -1,8 +1,6 @@
 """User repository — data access layer for the public.users table.
 
-Uses the Supabase client with parameterized queries only (constitution
-Article III §5: no string-interpolated SQL). No business logic
-(constitution Article I).
+Uses the Supabase client with parameterized queries only.
 """
 
 import structlog
@@ -20,11 +18,7 @@ class UserRepository:
 
     async def create_user(self, user_data: dict) -> dict:
         """Insert a new user row. Returns the created record."""
-        response = await (
-            self._client.table("users")
-            .insert(user_data)
-            .execute()
-        )
+        response = await self._client.table("users").insert(user_data).execute()
         if not response.data:
             logger.error("user_create_failed", user_id=user_data.get("id"))
             raise ProfileCreationError(user_data.get("id"))
@@ -43,15 +37,10 @@ class UserRepository:
         # object with empty data) when zero rows match the query.
         return response.data if response else None
 
-    async def update_user(
-        self, user_id: str, updates: dict
-    ) -> dict | None:
+    async def update_user(self, user_id: str, updates: dict) -> dict | None:
         """Update specific fields on a user row. Returns the updated record."""
         response = await (
-            self._client.table("users")
-            .update(updates)
-            .eq("id", user_id)
-            .execute()
+            self._client.table("users").update(updates).eq("id", user_id).execute()
         )
         if not response.data:
             logger.warning("user_update_empty", user_id=user_id)

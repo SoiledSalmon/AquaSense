@@ -66,7 +66,9 @@ class NotificationFormatter:
     """Formats raw alerts into readable messages and actionable recommendations."""
 
     @staticmethod
-    def format_alert(category: str, severity: str, value: float, reading: Dict[str, Any]) -> Dict[str, str]:
+    def format_alert(
+        category: str, severity: str, value: float, reading: Dict[str, Any]
+    ) -> Dict[str, str]:
         """Generate user-facing message and recommendation strings."""
         category = category.lower()
         severity = severity.lower()
@@ -110,16 +112,16 @@ class NotificationFormatter:
         elif category == "ml_recommendation":
             ml_label = str(reading.get("label", "unknown")).upper()
             message = f"ML Classification: Water is predicted to be {ml_label}"
-            recommendation = reading.get("recommendation") or "Check filter systems and re-test parameters."
+            recommendation = (
+                reading.get("recommendation")
+                or "Check filter systems and re-test parameters."
+            )
 
         else:
             message = "Water sensor status update warning"
             recommendation = "Please check your water quality metrics on the dashboard."
 
-        return {
-            "message": message,
-            "recommendation": recommendation
-        }
+        return {"message": message, "recommendation": recommendation}
 
 
 class AlertRuleEngine:
@@ -131,12 +133,12 @@ class AlertRuleEngine:
 
     def evaluate(self, reading: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Evaluate a reading and return list of candidate alert payloads.
-        
+
         Note: Alerts are generated only for unsafe or borderline parameters.
         """
         candidates = []
         user_id = reading.get("user_id")
-        timestamp = reading.get("timestamp")
+        reading.get("timestamp")
 
         if not user_id:
             return candidates
@@ -175,7 +177,9 @@ class AlertRuleEngine:
 
         return candidates
 
-    def _build_candidate(self, category: str, value: float, reading: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_candidate(
+        self, category: str, value: float, reading: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Helper to classify, format, and construct a candidate alert dictionary."""
         severity = self.severity_classifier.classify(category, value, reading)
         format_info = self.formatter.format_alert(category, severity, value, reading)
@@ -189,5 +193,5 @@ class AlertRuleEngine:
             "recommendation": format_info["recommendation"],
             "is_read": False,
             "is_acknowledged": False,
-            "is_resolved": False
+            "is_resolved": False,
         }

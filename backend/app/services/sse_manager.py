@@ -26,7 +26,11 @@ class SSEManager:
             if user_id not in self._user_queues:
                 self._user_queues[user_id] = set()
             self._user_queues[user_id].add(queue)
-            logger.info("sse_client_connected", user_id=user_id, active_connections=len(self._user_queues[user_id]))
+            logger.info(
+                "sse_client_connected",
+                user_id=user_id,
+                active_connections=len(self._user_queues[user_id]),
+            )
         return queue
 
     async def disconnect(self, user_id: str, queue: asyncio.Queue) -> None:
@@ -45,10 +49,7 @@ class SSEManager:
             if not queues:
                 return
 
-            payload = {
-                "event": event_type,
-                "data": data
-            }
+            payload = {"event": event_type, "data": data}
 
             for q in list(queues):
                 try:

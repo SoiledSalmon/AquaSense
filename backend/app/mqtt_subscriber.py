@@ -25,6 +25,7 @@ logger = structlog.get_logger()
 
 class ReadingInsert(BaseModel):
     """Pydantic model for validation of readings before DB insertion."""
+
     timestamp: datetime
     user_id: str
     ph: Optional[float] = Field(None, ge=0.0, le=14.0)
@@ -81,11 +82,21 @@ async def catch_up_user(user: dict, supabase_admin, settings, repo: ReadingsRepo
         # Use UTC timestamp string format for ThingSpeak GET (YYYY-MM-DD HH:MM:SS)
         # Convert timezone-aware datetime to UTC first
         last_ts_utc = last_ts.astimezone(timezone.utc)
-        start_str = last_ts_utc.strftime("%Y-%m-%d %H:%M:%S")
+        # Offset by 1 second to avoid re-fetching the last stored reading
+        # (ThingSpeak's 'start' parameter is inclusive)
+        start_dt = last_ts_utc + timedelta(seconds=1)
+        start_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
     else:
-        start_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+        start_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
 
-    logger.info("mqtt_catch_up_start", user_id=user_id, channel_id=channel_id, start_time=start_str)
+    logger.info(
+        "mqtt_catch_up_start",
+        user_id=user_id,
+        channel_id=channel_id,
+        start_time=start_str,
+    )
 
     url = f"https://api.thingspeak.com/channels/{channel_id}/feeds.json"
     params = {"start": start_str}
@@ -96,7 +107,11 @@ async def catch_up_user(user: dict, supabase_admin, settings, repo: ReadingsRepo
         try:
             response = await http_client.get(url, params=params, timeout=10.0)
             if response.status_code != 200:
-                logger.error("mqtt_catch_up_api_failed", user_id=user_id, status_code=response.status_code)
+                logger.error(
+                    "mqtt_catch_up_api_failed",
+                    user_id=user_id,
+                    status_code=response.status_code,
+                )
                 return
 
             data = response.json()
@@ -110,13 +125,13 @@ async def catch_up_user(user: dict, supabase_admin, settings, repo: ReadingsRepo
                     continue
 
                 feed_ts = datetime.fromisoformat(feed_created_at.replace("Z", "+00:00"))
-                # Skip duplicate readings
+                # Skip duplicate readings (safety net — API start is already offset by +1s)
                 if last_ts and feed_ts <= last_ts:
                     continue
 
                 ph = parse_float(feed.get("field1"))
-                tds = parse_float(feed.get("field2"))
-                turbidity = parse_float(feed.get("field3"))
+                tds = parse_float(feed.get("field3"))
+                turbidity = parse_float(feed.get("field2"))
 
                 try:
                     reading_obj = ReadingInsert(
@@ -124,10 +139,15 @@ async def catch_up_user(user: dict, supabase_admin, settings, repo: ReadingsRepo
                         user_id=user_id,
                         ph=ph,
                         tds=tds,
-                        turbidity=turbidity
+                        turbidity=turbidity,
                     )
                 except Exception as ve:
-                    logger.warning("mqtt_catch_up_validation_error", user_id=user_id, feed=feed, error=str(ve))
+                    logger.warning(
+                        "mqtt_catch_up_validation_error",
+                        user_id=user_id,
+                        feed=feed,
+                        error=str(ve),
+                    )
                     continue
 
                 try:
@@ -135,9 +155,13 @@ async def catch_up_user(user: dict, supabase_admin, settings, repo: ReadingsRepo
                     await ml_pipeline.process(inserted, repo)
                     inserted_count += 1
                 except Exception as ie:
-                    logger.error("mqtt_catch_up_insert_error", user_id=user_id, error=str(ie))
+                    logger.error(
+                        "mqtt_catch_up_insert_error", user_id=user_id, error=str(ie)
+                    )
 
-            logger.info("mqtt_catch_up_completed", user_id=user_id, inserted=inserted_count)
+            logger.info(
+                "mqtt_catch_up_completed", user_id=user_id, inserted=inserted_count
+            )
 
         except Exception as e:
             logger.error("mqtt_catch_up_failed", user_id=user_id, error=str(e))
@@ -151,7 +175,7 @@ async def handle_mqtt_message(message, repo: ReadingsRepository, sse_manager=Non
     logger.info("mqtt_msg_received", topic=topic, payload=payload_str)
 
     try:
-        parts = topic.split('/')
+        parts = topic.split("/")
         if len(parts) < 2:
             logger.warning("mqtt_invalid_topic", topic=topic)
             return
@@ -172,8 +196,8 @@ async def handle_mqtt_message(message, repo: ReadingsRepository, sse_manager=Non
             timestamp = datetime.now(timezone.utc)
 
         ph = parse_float(data.get("field1"))
-        tds = parse_float(data.get("field2"))
-        turbidity = parse_float(data.get("field3"))
+        tds = parse_float(data.get("field3"))
+        turbidity = parse_float(data.get("field2"))
 
         try:
             reading_obj = ReadingInsert(
@@ -181,7 +205,7 @@ async def handle_mqtt_message(message, repo: ReadingsRepository, sse_manager=Non
                 user_id=user_id,
                 ph=ph,
                 tds=tds,
-                turbidity=turbidity
+                turbidity=turbidity,
             )
         except Exception as ve:
             logger.warning("mqtt_msg_validation_error", user_id=user_id, error=str(ve))
@@ -191,7 +215,7 @@ async def handle_mqtt_message(message, repo: ReadingsRepository, sse_manager=Non
         logger.info("mqtt_msg_inserted", reading_id=inserted.get("id"), user_id=user_id)
 
         processed = await ml_pipeline.process(inserted, repo)
-        
+
         if sse_manager:
             # Serialise datetime fields for JSON transmission
             serializable = {}
@@ -201,7 +225,7 @@ async def handle_mqtt_message(message, repo: ReadingsRepository, sse_manager=Non
                 else:
                     serializable[k] = v
             await sse_manager.send_event(user_id, "reading_update", serializable)
-            
+
             # Send new alert event over SSE if generated
             new_alert = processed.get("new_alert")
             if new_alert:
@@ -219,7 +243,9 @@ async def handle_mqtt_message(message, repo: ReadingsRepository, sse_manager=Non
         logger.error("mqtt_processing_error", error=str(e))
 
 
-async def poll_new_channels_loop(client, supabase_admin, repo: ReadingsRepository, settings):
+async def poll_new_channels_loop(
+    client, supabase_admin, repo: ReadingsRepository, settings
+):
     """Background loop checking for newly registered channels and subscribing to them."""
     while True:
         try:
@@ -263,11 +289,12 @@ async def run_mqtt_subscriber(app):
                 port=443,
                 username=settings.THINGSPEAK_MQTT_USER,
                 password=settings.THINGSPEAK_MQTT_API_KEY,
-                identifier=settings.THINGSPEAK_MQTT_USER,
+                identifier=settings.THINGSPEAK_MQTT_CLIENT_ID
+                or settings.THINGSPEAK_MQTT_USER,
                 transport="websockets",
                 websocket_path="/mqtt",
                 tls_context=context,
-                timeout=15.0,
+                keepalive=60,
             ) as client:
                 logger.info("mqtt_connected")
                 app.state.mqtt_status = "connected"
@@ -301,9 +328,15 @@ async def run_mqtt_subscriber(app):
                         await handle_mqtt_message(message, repo, app.state.sse_manager)
                 finally:
                     poll_task.cancel()
+                    try:
+                        await poll_task
+                    except (asyncio.CancelledError, Exception):
+                        pass
 
-        except aiomqtt.MqttError as me:
-            logger.warning("mqtt_connection_error", error=str(me), retry_in=reconnect_delay)
+        except (aiomqtt.MqttError, aiomqtt.MqttCodeError) as me:
+            logger.warning(
+                "mqtt_connection_error", error=str(me), retry_in=reconnect_delay
+            )
             app.state.mqtt_status = "reconnecting"
             await asyncio.sleep(reconnect_delay)
             reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
@@ -312,8 +345,9 @@ async def run_mqtt_subscriber(app):
             app.state.mqtt_status = "stopped"
             break
         except Exception as e:
-            logger.error("mqtt_unexpected_error", error=str(e), retry_in=reconnect_delay)
+            logger.error(
+                "mqtt_unexpected_error", error=str(e), retry_in=reconnect_delay
+            )
             app.state.mqtt_status = "error"
             await asyncio.sleep(reconnect_delay)
             reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
-
