@@ -849,19 +849,19 @@ export default function LiveDashboard({ user }: { user: User }) {
           <div>
             <div className="flex items-baseline gap-1">
               <span
-                className={`text-3xl font-extrabold ${tdsZone(latestReading?.tds || null)}`}
+                className={`text-3xl font-extrabold ${turbidityZone(latestReading?.turbidity || null)}`}
               >
-                {latestReading?.tds !== undefined && latestReading.tds !== null
-                  ? Math.round(latestReading.tds)
+                {latestReading?.turbidity !== undefined && latestReading.turbidity !== null
+                  ? latestReading.turbidity.toFixed(2)
                   : "—"}
               </span>
-              <span className="text-xs text-slate-500">ppm</span>
+              <span className="text-xs text-slate-500">NTU</span>
             </div>
             <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
               <div
                 className="bg-amber-400 h-full rounded-full transition-all duration-1000"
                 style={{
-                  width: `${latestReading?.tds ? Math.min((latestReading.tds / 1000) * 100, 100) : 0}%`,
+                  width: `${latestReading?.turbidity ? Math.min((latestReading.turbidity / 20) * 100, 100) : 0}%`,
                 }}
               />
             </div>
@@ -884,20 +884,19 @@ export default function LiveDashboard({ user }: { user: User }) {
           <div>
             <div className="flex items-baseline gap-1">
               <span
-                className={`text-3xl font-extrabold ${turbidityZone(latestReading?.turbidity || null)}`}
+                className={`text-3xl font-extrabold ${tdsZone(latestReading?.tds || null)}`}
               >
-                {latestReading?.turbidity !== undefined &&
-                latestReading.turbidity !== null
-                  ? latestReading.turbidity.toFixed(2)
+                {latestReading?.tds !== undefined && latestReading.tds !== null
+                  ? Math.round(latestReading.tds)
                   : "—"}
               </span>
-              <span className="text-xs text-slate-500">NTU</span>
+              <span className="text-xs text-slate-500">ppm</span>
             </div>
             <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
               <div
                 className="bg-violet-400 h-full rounded-full transition-all duration-1000"
                 style={{
-                  width: `${latestReading?.turbidity ? Math.min((latestReading.turbidity / 20) * 100, 100) : 0}%`,
+                  width: `${latestReading?.tds ? Math.min((latestReading.tds / 1000) * 100, 100) : 0}%`,
                 }}
               />
             </div>

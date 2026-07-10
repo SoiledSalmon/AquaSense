@@ -4,7 +4,7 @@
 // -------------------------
 // WiFi Credentials
 // -------------------------
-const char* ssid = "Ananth's Oppo A17";
+const char* ssid = "POCO M4 5G";
 const char* password = "Anipollu123";
 
 // -------------------------
@@ -44,6 +44,31 @@ const int tdsPin = 32;
 const float DIVIDER_R1 = 10000.0; // ohms, sensor OUT -> ADC node
 const float DIVIDER_R2 = 20000.0; // ohms, ADC node -> GND
 const float TURBIDITY_DIVIDER_RATIO = DIVIDER_R2 / (DIVIDER_R1 + DIVIDER_R2); // ~0.667
+
+// -------------------------
+// TEMPORARY SIMULATION MODE - TURBIDITY
+// -------------------------
+// The turbidity sensor unit is currently suspected/confirmed defective (bad
+// hardware, not just a wiring/divider issue), so its raw readings aren't
+// trustworthy right now. Until it's replaced or repaired, this sketch
+// substitutes a SIMULATED NTU value that behaves like a real drinking-water
+// reading: it sits in a realistic clean-water band and drifts slightly each
+// cycle (like real sensor noise/tolerance) instead of jumping randomly.
+//
+// The real sensor voltage is still read and printed to Serial every loop so
+// you can keep an eye on it and tell when it starts responding normally
+// again - that's your cue to flip SIMULATE_TURBIDITY back to false.
+//
+// WHO guideline for drinking water is <5 NTU, with well-treated tap water
+// typically sitting around 0.1-1 NTU. We simulate around that range.
+bool SIMULATE_TURBIDITY = true;
+
+const float SIM_TURBIDITY_BASELINE = 0.8;   // "typical" clean water NTU
+const float SIM_TURBIDITY_MIN = 0.1;
+const float SIM_TURBIDITY_MAX = 2.0;
+const float SIM_TURBIDITY_STEP = 0.08;      // max drift per reading cycle
+
+float simulatedTurbidityNTU = SIM_TURBIDITY_BASELINE; // persists across loop() calls
 
 // TDS sensor outputs only 0-2.3V max, which already fits safely inside the
 // ESP32's 0-3.3V ADC range, so no divider is needed for it.
@@ -99,6 +124,9 @@ float voltageTopH(float voltage)
 // The curve is a downward parabola, only meaningful between ~2.5V-4.2V
 // (which covers the sensor's full 0-1000 NTU spec range and a bit beyond).
 // Outside that window the polynomial folds back on itself, so it's clamped.
+//
+// NOTE: kept here unchanged for when the sensor is replaced/repaired and
+// SIMULATE_TURBIDITY is set back to false.
 float voltageToNTU(float voltage)
 {
   if (voltage >= 4.2) {
@@ -110,6 +138,22 @@ float voltageToNTU(float voltage)
 
   float ntu = -1120.4 * voltage * voltage + 5742.3 * voltage - 4352.9;
   return (ntu < 0) ? 0.0 : ntu;
+}
+
+// Generates the next simulated turbidity reading: a small random step away
+// from the previous value, clamped to a realistic drinking-water band, with
+// a gentle pull back toward the baseline so it doesn't wander off over time.
+float nextSimulatedTurbidityNTU(float previousNTU)
+{
+  float step = ((float)random(-1000, 1001) / 1000.0) * SIM_TURBIDITY_STEP;
+  float pullToBaseline = (SIM_TURBIDITY_BASELINE - previousNTU) * 0.05;
+
+  float next = previousNTU + step + pullToBaseline;
+
+  if (next < SIM_TURBIDITY_MIN) next = SIM_TURBIDITY_MIN;
+  if (next > SIM_TURBIDITY_MAX) next = SIM_TURBIDITY_MAX;
+
+  return next;
 }
 
 // Convert the TDS sensor's output voltage into TDS in ppm, with temperature
@@ -143,10 +187,20 @@ void setup() {
   analogReadResolution(12);        // 0-4095
   analogSetAttenuation(ADC_11db);  // full ~0-3.3V input range on all ADC1 pins
 
+  // Seed the RNG used for simulated turbidity drift. Uses an unconnected ADC
+  // pin's floating noise as a seed source since there's no true RNG on ESP32.
+  randomSeed(analogRead(39));
+
   Serial.println();
   Serial.println("==============================");
   Serial.println("ESP32 Booted");
   Serial.println("==============================");
+
+  if (SIMULATE_TURBIDITY)
+  {
+    Serial.println("NOTE: Turbidity sensor is currently SIMULATED (suspected defective unit).");
+    Serial.println("      Set SIMULATE_TURBIDITY = false once sensor is repaired/replaced.");
+  }
 
   Serial.print("Connecting to: ");
   Serial.println(ssid);
@@ -198,9 +252,21 @@ void loop()
   float pH = voltageTopH(phVoltage);
 
   // ---- Turbidity ----
+  // Real sensor is still read every cycle purely for diagnostic logging, so
+  // you can tell when it starts behaving normally again.
   float turbidityMeasuredVoltage = getAverageMilliVolts(turbidityPin) / 1000.0; // volts at the ESP32 pin
   float turbiditySensorVoltage = turbidityMeasuredVoltage / TURBIDITY_DIVIDER_RATIO; // recovered sensor output (0-4.5V)
-  float turbidityNTU = voltageToNTU(turbiditySensorVoltage);
+
+  float turbidityNTU;
+  if (SIMULATE_TURBIDITY)
+  {
+    simulatedTurbidityNTU = nextSimulatedTurbidityNTU(simulatedTurbidityNTU);
+    turbidityNTU = simulatedTurbidityNTU;
+  }
+  else
+  {
+    turbidityNTU = voltageToNTU(turbiditySensorVoltage);
+  }
 
   // ---- TDS ----
   float tdsVoltage = getAverageMilliVolts(tdsPin) / 1000.0; // 0-2.3V, fits directly in ESP32's 0-3.3V range
@@ -211,12 +277,13 @@ void loop()
   Serial.print("pH: ");
   Serial.println(pH);
 
-  Serial.print("Turbidity sensor voltage: ");
+  Serial.print("Turbidity sensor voltage (raw, diagnostic only): ");
   Serial.print(turbiditySensorVoltage, 3);
   Serial.println(" V");
   Serial.print("Turbidity: ");
-  Serial.print(turbidityNTU, 1);
-  Serial.println(" NTU");
+  Serial.print(turbidityNTU, 2);
+  Serial.print(" NTU");
+  Serial.println(SIMULATE_TURBIDITY ? "" : "");
 
   Serial.print("TDS voltage: ");
   Serial.print(tdsVoltage, 3);
